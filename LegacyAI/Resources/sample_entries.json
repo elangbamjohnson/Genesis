@@ -1,0 +1,34 @@
+[
+  {
+    "category" : "Career",
+    "content" : "I learned that meaningful work is rarely just about a title. The moments that mattered most were when I built something useful, explained it clearly, and helped someone else become more confident.",
+    "date" : "2026-01-01T00:00:00Z",
+    "id" : "B1D13353-3384-4C89-AB13-8BD2FA26B601",
+    "tags" : [
+      "career",
+      "reflection"
+    ],
+    "title" : "Career reflection"
+  },
+  {
+    "category" : "Values",
+    "content" : "If I had to leave one piece of advice, it would be this: stay honest about what you know, be gentle with people who are learning, and do the small consistent things even when nobody is watching.",
+    "date" : "2026-01-02T00:00:00Z",
+    "id" : "AF18D5C8-C80A-4C18-BD55-C3345E173943",
+    "tags" : [
+      "values",
+      "advice"
+    ],
+    "title" : "Advice I want remembered"
+  },
+  {
+    "category" : "Other",
+    "content" : "Replace this placeholder with a real memory. Phase 1 works best when each entry captures one specific story, belief, lesson, or moment in plain language.",
+    "date" : "2026-01-03T00:00:00Z",
+    "id" : "F50AC613-52B9-4304-A859-FB9781C7F1E4",
+    "tags" : [
+      "placeholder"
+    ],
+    "title" : "How to replace this sample"
+  }
+]
