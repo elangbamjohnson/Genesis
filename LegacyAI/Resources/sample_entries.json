@@ -1,3 +1,4 @@
+
 [
     {
       "category": "Childhood",
@@ -12,5 +13,32 @@
         "Imphal"
       ],
       "title": "My earliest memory — first day of nursery school"
-    }
+    },
+  {
+    "category": "Other",
+    "content": "My legal name is Elangbam Johnson Singh, but I want to call myself Johnson Elangbam, my neighbourhood friend called me Abung/Dabung , and alsy by my relatives",
+    "date": "2026-02-01T00:00:00Z",
+    "id": "9D92F014-503C-43A0-BBA1-2517A2C74FD4",
+    "tags": [
+      "biography",
+      "name",
+      "identity"
+    ],
+    "title": "Full name and what people call me"
+  },
+  {
+    "category": "Other",
+    "content": " I was born on June 27 1980, but in my school record it is written as March 5 1982. I was born in Imphal, Manipur, India, at RIMS hospital ( Then RMC).",
+    "date": "2026-02-02T00:00:00Z",
+    "id": "D7F10471-9EF3-4649-98A5-D097233BC50A",
+    "tags": [
+      "biography",
+      "date of birth",
+      "birthday",
+      "age",
+      "birthplace",
+      "birth place"
+    ],
+    "title": "Date and place of birth"
+  }
 ]
