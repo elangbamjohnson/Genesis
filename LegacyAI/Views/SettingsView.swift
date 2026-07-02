@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var isTestingChat = false
     @State private var connectionMessage: String?
     @State private var connectionSucceeded = false
+    @State private var sampleImportMessage: String?
+    @State private var sampleImportSucceeded = false
 
     private let chatService = MLXChatService()
 
@@ -89,6 +91,22 @@ struct SettingsView: View {
 
                 Section("Archive") {
                     LabeledContent("Memory entries", value: "\(archiveStore.entries.count)")
+
+                    Button("Load bundled sample memories") {
+                        importSampleMemories()
+                    }
+
+                    if let sampleImportMessage {
+                        Text(sampleImportMessage)
+                            .font(.footnote)
+                            .foregroundStyle(sampleImportSucceeded ? .green : .red)
+                    }
+
+                    if let loadError = archiveStore.loadError {
+                        Text(loadError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
                 }
             }
             .navigationTitle("Settings")
@@ -136,6 +154,24 @@ struct SettingsView: View {
         } catch {
             connectionMessage = error.localizedDescription
             connectionSucceeded = false
+        }
+    }
+
+    @MainActor
+    private func importSampleMemories() {
+        do {
+            let importCount = try archiveStore.importSeedEntries()
+            sampleImportSucceeded = true
+            if importCount == 0 {
+                sampleImportMessage = "No new bundled sample memories found."
+            } else if importCount == 1 {
+                sampleImportMessage = "Loaded 1 bundled sample memory."
+            } else {
+                sampleImportMessage = "Loaded \(importCount) bundled sample memories."
+            }
+        } catch {
+            sampleImportSucceeded = false
+            sampleImportMessage = error.localizedDescription
         }
     }
 }

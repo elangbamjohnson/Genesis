@@ -91,6 +91,22 @@ final class ArchiveStore: ObservableObject {
         )
     }
 
+    @discardableResult
+    func importSeedEntries() throws -> Int {
+        let seedEntries = try loadSeedEntries()
+        let existingIDs = Set(entries.map(\.id))
+        let newEntries = seedEntries.filter { !existingIDs.contains($0.id) }
+
+        guard !newEntries.isEmpty else {
+            return 0
+        }
+
+        entries.insert(contentsOf: newEntries, at: 0)
+        save()
+
+        return newEntries.count
+    }
+
     private func load() async {
         do {
             let archiveURL = try archiveFileURL()

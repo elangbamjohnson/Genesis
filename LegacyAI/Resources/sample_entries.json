@@ -1,34 +1,16 @@
 [
-  {
-    "category" : "Career",
-    "content" : "I learned that meaningful work is rarely just about a title. The moments that mattered most were when I built something useful, explained it clearly, and helped someone else become more confident.",
-    "date" : "2026-01-01T00:00:00Z",
-    "id" : "B1D13353-3384-4C89-AB13-8BD2FA26B601",
-    "tags" : [
-      "career",
-      "reflection"
-    ],
-    "title" : "Career reflection"
-  },
-  {
-    "category" : "Values",
-    "content" : "If I had to leave one piece of advice, it would be this: stay honest about what you know, be gentle with people who are learning, and do the small consistent things even when nobody is watching.",
-    "date" : "2026-01-02T00:00:00Z",
-    "id" : "AF18D5C8-C80A-4C18-BD55-C3345E173943",
-    "tags" : [
-      "values",
-      "advice"
-    ],
-    "title" : "Advice I want remembered"
-  },
-  {
-    "category" : "Other",
-    "content" : "Replace this placeholder with a real memory. Phase 1 works best when each entry captures one specific story, belief, lesson, or moment in plain language.",
-    "date" : "2026-01-03T00:00:00Z",
-    "id" : "F50AC613-52B9-4304-A859-FB9781C7F1E4",
-    "tags" : [
-      "placeholder"
-    ],
-    "title" : "How to replace this sample"
-  }
+    {
+      "category": "Childhood",
+      "content": "My earliest memory is my first day of school, in what we called nursery class, at Don Bosco High School in Chingmeirong, Imphal, Manipur. I was born in 1980, so this must have been around 1983 or 1984 — I was three or four. My aunt, who I call Echeme (her name is Meme Soraisham), used to drop me off. She's one of my closest aunts and always took real good care of me. I remember sitting in class, looking out the window, and telling my teacher I needed to pee. She was a kind lady named Miss Philomina, and she let me do it right out of the window, holding onto the grill. I also remember Echeme bringing me nice snacks during class time — she'd peek through the window looking for me so she could pass them through.",
+      "date": "2026-01-01T00:00:00Z",
+      "id": "A2D21C40-7FE9-4183-9316-486D3772645A",
+      "tags": [
+        "childhood",
+        "earliest-memory",
+        "school",
+        "family",
+        "Imphal"
+      ],
+      "title": "My earliest memory — first day of nursery school"
+    }
 ]
