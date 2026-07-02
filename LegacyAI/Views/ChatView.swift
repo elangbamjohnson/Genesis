@@ -168,14 +168,18 @@ struct ChatView: View {
         let intent = ConversationIntentClassifier.classify(question)
 
         let retrievedEntries: [LifeEntry]
-        if intent == .smallTalk {
+        switch intent {
+        case .smallTalk:
             retrievedEntries = []
-        } else {
+        case .broadOverview:
+            retrievedEntries = retrievalEngine.retrieveOverviewEntries(from: archiveStore.entries)
+        case .informationRequest:
             retrievedEntries = retrievalEngine.retrieveRelevantEntries(
                 for: question,
                 from: archiveStore.entries
             )
         }
+        
         let sourceTitles = retrievedEntries.map(\.title)
 
         messages.append(ChatMessage(role: .user, content: question))
