@@ -28,8 +28,8 @@ enum ConversationIntentClassifier {
             return .smallTalk
         }
         
-        if broadOverviewPhrases.contains(where: { normalized.contains($0) }) {
-                return .broadOverview
+        if broadOverviewPhrases.contains(where: { matchesWholePhrase(normalized, phrase: $0) }) {
+            return .broadOverview
         }
 
         let words = normalized.split(separator: " ").map(String.init)
@@ -54,6 +54,22 @@ enum ConversationIntentClassifier {
             .components(separatedBy: .whitespaces)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
+    }
+
+    private static func matchesWholePhrase(_ normalized: String, phrase: String) -> Bool {
+        if normalized == phrase {
+            return true
+        }
+
+        if normalized.hasPrefix(phrase + " ") {
+            return true
+        }
+
+        if normalized.hasSuffix(" " + phrase) {
+            return true
+        }
+
+        return normalized.contains(" " + phrase + " ")
     }
 
     private static let broadOverviewPhrases: Set<String> = [

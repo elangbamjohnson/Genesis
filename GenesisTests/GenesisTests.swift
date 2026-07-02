@@ -118,4 +118,35 @@ struct GenesisTests {
     @Test func classifiesEmptyStringAsSmallTalk() {
         #expect(ConversationIntentClassifier.classify("   ") == .smallTalk)
     }
+
+    @Test func classifiesTellMeAboutYourselfAsBroadOverview() {
+        #expect(ConversationIntentClassifier.classify("tell me about yourself") == .broadOverview)
+        #expect(ConversationIntentClassifier.classify("who are you") == .broadOverview)
+    }
+
+    @Test func doesNotClassifySchoolQuestionAsBroadOverview() {
+        #expect(
+            ConversationIntentClassifier.classify("tell me about your school") == .informationRequest
+        )
+    }
+
+    @Test func parsesRouterSmallTalkJSON() {
+        let decision = MemoryRouterService.parseDecision(
+            from: #"{"intent": "small_talk", "relevant_ids": []}"#
+        )
+        #expect(decision?.intent == .smallTalk)
+        #expect(decision?.relevantEntryIDs.isEmpty == true)
+    }
+
+    @Test func parsesRouterNoMatchJSON() {
+        let decision = MemoryRouterService.parseDecision(
+            from: #"{"intent": "no_match", "relevant_ids": ["A2D21C40-7FE9-4183-9316-486D3772645A"]}"#
+        )
+        #expect(decision?.intent == .informationRequest)
+        #expect(decision?.relevantEntryIDs.isEmpty == true)
+    }
+
+    @Test func parsesInvalidRouterJSONAsNil() {
+        #expect(MemoryRouterService.parseDecision(from: "not json") == nil)
+    }
 }
