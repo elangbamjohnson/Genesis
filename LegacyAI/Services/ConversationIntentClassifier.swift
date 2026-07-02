@@ -9,6 +9,7 @@ import Foundation
 
 enum ConversationIntent {
     case smallTalk
+    case broadOverview
     case informationRequest
 }
 
@@ -25,6 +26,10 @@ enum ConversationIntentClassifier {
 
         if exactSmallTalkPhrases.contains(normalized) {
             return .smallTalk
+        }
+        
+        if broadOverviewPhrases.contains(where: { normalized.contains($0) }) {
+                return .broadOverview
         }
 
         let words = normalized.split(separator: " ").map(String.init)
@@ -51,6 +56,14 @@ enum ConversationIntentClassifier {
             .joined(separator: " ")
     }
 
+    private static let broadOverviewPhrases: Set<String> = [
+        "tell me about yourself", "tell me about you",
+        "who are you", "introduce yourself",
+        "what are you like", "describe yourself",
+        "what is your story", "whats your story", "tell me your story",
+        "give me an overview", "sum yourself up"
+    ]
+    
     private static let exactSmallTalkPhrases: Set<String> = [
         "hi", "holla", "hello", "hey", "hiya", "yo", "howdy", "sup",
         "good morning", "good afternoon", "good evening", "good night",

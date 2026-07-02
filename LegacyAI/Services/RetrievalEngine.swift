@@ -32,6 +32,25 @@ struct RetrievalEngine {
             .prefix(maxResults)
             .map(\.entry)
     }
+    
+    /// For broad, open-ended questions ("tell me about yourself") rather than
+    /// a specific fact lookup — pulls a diverse cross-section: the most recent
+    /// entry from each distinct category, rather than trying to keyword-match.
+    func retrieveOverviewEntries(from entries: [LifeEntry], maxResults: Int = 6) -> [LifeEntry] {
+        guard !entries.isEmpty else { return [] }
+
+        var seenCategories = Set<LifeEntry.Category>()
+        var overview: [LifeEntry] = []
+
+        for entry in entries.sorted(by: { $0.date > $1.date }) {
+            guard !seenCategories.contains(entry.category) else { continue }
+            seenCategories.insert(entry.category)
+            overview.append(entry)
+            if overview.count >= maxResults { break }
+        }
+
+        return overview
+    }
 
     private func scoreEntry(
         _ entry: LifeEntry,
