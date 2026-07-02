@@ -94,4 +94,28 @@ struct GenesisTests {
 
         #expect(results.isEmpty)
     }
+
+    @Test func classifiesGreetingsAsSmallTalk() {
+        #expect(ConversationIntentClassifier.classify("hi") == .smallTalk)
+        #expect(ConversationIntentClassifier.classify("Hello!") == .smallTalk)
+        #expect(ConversationIntentClassifier.classify("good morning") == .smallTalk)
+    }
+
+    @Test func classifiesHiGenesisAsSmallTalk() {
+        #expect(ConversationIntentClassifier.classify("hi genesis") == .smallTalk)
+        #expect(ConversationIntentClassifier.classify("hey there") == .smallTalk)
+    }
+
+    @Test func classifiesMemoryQuestionsAsInformationRequest() {
+        #expect(
+            ConversationIntentClassifier.classify("tell me about my childhood") == .informationRequest
+        )
+        #expect(
+            ConversationIntentClassifier.classify("what school did I attend") == .informationRequest
+        )
+    }
+
+    @Test func classifiesEmptyStringAsSmallTalk() {
+        #expect(ConversationIntentClassifier.classify("   ") == .smallTalk)
+    }
 }

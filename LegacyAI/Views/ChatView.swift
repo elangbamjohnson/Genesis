@@ -10,6 +10,7 @@ struct ChatView: View {
     @State private var errorMessage: String?
     @State private var statusMessage = ""
     @State private var sendTask: Task<Void, Never>?
+    @FocusState private var isInputFocused: Bool
 
     private let retrievalEngine = RetrievalEngine()
     private let promptBuilder = PersonaPromptBuilder()
@@ -58,27 +59,72 @@ struct ChatView: View {
     }
 
     private var messageList: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(messages) { message in
-                    ChatBubble(message: message)
-                }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(messages) { message in
+                        ChatBubble(message: message)
+                            .id(message.id)
+                    }
 
-                if isLoading {
-                    ProgressView(statusMessage.isEmpty ? "Asking local model..." : statusMessage)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if isLoading {
+                        ProgressView(statusMessage.isEmpty ? "Asking local model..." : statusMessage)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id(Self.bottomAnchorID)
+                }
+                .padding()
+            }
+            .onChange(of: messages.count) { _ in
+                scrollToBottom(proxy: proxy, animated: true)
+            }
+            .onChange(of: isLoading) { _ in
+                scrollToBottom(proxy: proxy, animated: true)
+                if !isLoading {
+                    Task {
+                        try? await Task.sleep(nanoseconds: 150_000_000)
+                        isInputFocused = true
+                    }
                 }
             }
-            .padding()
+            .onChange(of: isInputFocused) { focused in
+                guard focused else { return }
+                Task {
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    scrollToBottom(proxy: proxy, animated: true)
+                }
+            }
+            .onAppear {
+                scrollToBottom(proxy: proxy, animated: false)
+            }
+        }
+    }
+
+    private static let bottomAnchorID = "bottom-anchor"
+
+    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
+        if animated {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            }
+        } else {
+            proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
         }
     }
 
     private var inputBar: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            TextField("Ask about your life...", text: $draft, axis: .vertical)
+        HStack(alignment: .center, spacing: 8) {
+            TextField("Ask about your life...", text: $draft)
                 .textFieldStyle(.roundedBorder)
-                .lineLimit(1...4)
                 .disabled(isLoading)
+                .focused($isInputFocused)
+                .submitLabel(.send)
+                .onSubmit {
+                    triggerSend()
+                }
 
             if isLoading {
                 Button("Cancel", role: .cancel) {
@@ -86,9 +132,7 @@ struct ChatView: View {
                 }
             } else {
                 Button {
-                    sendTask = Task {
-                        await send()
-                    }
+                    triggerSend()
                 } label: {
                     Text("Send")
                 }
@@ -97,6 +141,13 @@ struct ChatView: View {
         }
         .padding()
         .background(.bar)
+    }
+
+    private func triggerSend() {
+        guard !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isLoading else { return }
+        sendTask = Task {
+            await send()
+        }
     }
 
     @MainActor
@@ -114,15 +165,22 @@ struct ChatView: View {
             sendTask = nil
         }
 
-        let retrievedEntries = retrievalEngine.retrieveRelevantEntries(
-            for: question,
-            from: archiveStore.entries
-        )
+        let intent = ConversationIntentClassifier.classify(question)
+
+        let retrievedEntries: [LifeEntry]
+        if intent == .smallTalk {
+            retrievedEntries = []
+        } else {
+            retrievedEntries = retrievalEngine.retrieveRelevantEntries(
+                for: question,
+                from: archiveStore.entries
+            )
+        }
         let sourceTitles = retrievedEntries.map(\.title)
 
         messages.append(ChatMessage(role: .user, content: question))
 
-        guard !retrievedEntries.isEmpty else {
+        if intent == .informationRequest, retrievedEntries.isEmpty {
             messages.append(
                 ChatMessage(
                     role: .assistant,
@@ -132,12 +190,25 @@ struct ChatView: View {
             return
         }
 
-        let systemPrompt = promptBuilder.buildSystemPrompt(
-            personaName: settings.personaName,
-            styleNotes: settings.styleNotes,
-            memories: retrievedEntries
-        )
-        let userPrompt = promptBuilder.buildUserPrompt(question: question)
+        let systemPrompt: String
+        if intent == .smallTalk {
+            systemPrompt = promptBuilder.buildSmallTalkSystemPrompt(
+                personaName: settings.personaName,
+                styleNotes: settings.styleNotes
+            )
+        } else {
+            systemPrompt = promptBuilder.buildSystemPrompt(
+                personaName: settings.personaName,
+                styleNotes: settings.styleNotes,
+                memories: retrievedEntries
+            )
+        }
+        let userPrompt: String
+        if intent == .smallTalk {
+            userPrompt = promptBuilder.buildSmallTalkUserPrompt(question: question)
+        } else {
+            userPrompt = promptBuilder.buildUserPrompt(question: question)
+        }
         let history = Array(messages.dropLast())
 
         do {

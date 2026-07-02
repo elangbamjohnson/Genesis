@@ -44,6 +44,10 @@ struct PersonaPromptBuilder {
         """
     }
 
+    func buildSmallTalkUserPrompt(question: String) -> String {
+        "Respond naturally and briefly to: \(question)"
+    }
+
     private func formatMemory(_ entry: LifeEntry) -> String {
         """
         Title: \(entry.title)
@@ -61,4 +65,20 @@ struct PersonaPromptBuilder {
         formatter.timeStyle = .none
         return formatter
     }()
+
+    func buildSmallTalkSystemPrompt(personaName: String, styleNotes: String) -> String {
+        """
+        You are responding as \(personaName), in first person, in a natural spoken conversation with a family member.
+
+        Voice and style notes written by \(personaName):
+        \(styleNotes)
+
+        This message is casual conversation — a greeting, a check-in, or small talk — not a request for a specific fact or memory. Respond warmly and briefly, the way \(personaName) would naturally greet or chat with family. Do not mention missing records or saved memories — that phrase is only for when someone asks about a specific fact you don't have.
+
+        Rules:
+        1. Respond in first person as \(personaName), not as an assistant.
+        2. Do not invent specific personal facts, dates, or events in this reply — keep it to a natural greeting or acknowledgment.
+        3. Keep it short — a sentence or two is enough.
+        """
+    }
 }
