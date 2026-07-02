@@ -165,19 +165,38 @@ struct ChatView: View {
             sendTask = nil
         }
 
-        let intent = ConversationIntentClassifier.classify(question)
+        statusMessage = "Working out what you're asking..."
+        let routeDecision = await MemoryRouterService.route(
+            question: question,
+            entries: archiveStore.entries,
+            chatService: chatService,
+            baseURL: settings.serverBaseURL,
+            modelName: settings.modelName
+        )
 
+        let intent: ConversationIntent
         let retrievedEntries: [LifeEntry]
-        switch intent {
-        case .smallTalk:
-            retrievedEntries = []
-        case .broadOverview:
-            retrievedEntries = retrievalEngine.retrieveOverviewEntries(from: archiveStore.entries)
-        case .informationRequest:
-            retrievedEntries = retrievalEngine.retrieveRelevantEntries(
-                for: question,
-                from: archiveStore.entries
-            )
+
+        if let routeDecision {
+            // The model itself judged intent and relevance.
+            intent = routeDecision.intent
+            let idSet = Set(routeDecision.relevantEntryIDs)
+            retrievedEntries = archiveStore.entries.filter { idSet.contains($0.id) }
+        } else {
+            // Router failed or returned something unparseable — fall back to the
+            // original keyword-based system so the chat still works.
+            intent = ConversationIntentClassifier.classify(question)
+            switch intent {
+            case .smallTalk:
+                retrievedEntries = []
+            case .broadOverview:
+                retrievedEntries = retrievalEngine.retrieveOverviewEntries(from: archiveStore.entries)
+            case .informationRequest:
+                retrievedEntries = retrievalEngine.retrieveRelevantEntries(
+                    for: question,
+                    from: archiveStore.entries
+                )
+            }
         }
         
         let sourceTitles = retrievedEntries.map(\.title)
