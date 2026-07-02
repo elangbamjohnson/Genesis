@@ -107,7 +107,7 @@ struct MLXChatService {
         systemPrompt: String,
         baseURL: String,
         modelName: String,
-        maxTokens: Int = 300,
+        maxTokens: Int = 400,
         timeoutInterval: TimeInterval = 120,
         performsPreflight: Bool = true
     ) async throws -> String {
@@ -124,7 +124,7 @@ struct MLXChatService {
                 .init(role: .system, content: systemPrompt),
                 .init(role: .user, content: question)
             ],
-            temperature: 0.2,
+            temperature: 0.5,
             maxTokens: maxTokens,
             stream: false
         )
