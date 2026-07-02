@@ -31,7 +31,7 @@ struct GenesisTests {
         let entry = LifeEntry(
             title: "Growing up near the river",
             content: "When I was young, evenings by the river felt peaceful.",
-            category: .imported
+            category: .childhood
         )
 
         let results = RetrievalEngine().retrieveRelevantEntries(

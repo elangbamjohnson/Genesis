@@ -138,12 +138,14 @@ struct ChatView: View {
             memories: retrievedEntries
         )
         let userPrompt = promptBuilder.buildUserPrompt(question: question)
+        let history = Array(messages.dropLast())
 
         do {
             statusMessage = "Waiting for local model. First response can take a while..."
             let answer = try await chatService.send(
                 question: userPrompt,
                 systemPrompt: systemPrompt,
+                history: history,
                 baseURL: settings.serverBaseURL,
                 modelName: settings.modelName,
                 maxTokens: 400,

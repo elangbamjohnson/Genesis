@@ -59,7 +59,9 @@ struct RetrievalEngine {
         }
         let isBroadChildhoodQuery = coreQueryTerms.contains("childhood")
         let childhoodBoost = isBroadChildhoodQuery && entry.category == .childhood ? 15 : 0
-        let canUseRelatedOnlyMatch = isBroadChildhoodQuery && expandedScore > 0
+        let canUseRelatedOnlyMatch = isBroadChildhoodQuery
+            && entry.category == .childhood
+            && expandedScore > 0
 
         guard directScore > 0 || childhoodBoost > 0 || canUseRelatedOnlyMatch else {
             return 0

@@ -105,6 +105,7 @@ struct MLXChatService {
     func send(
         question: String,
         systemPrompt: String,
+        history: [ChatMessage] = [],
         baseURL: String,
         modelName: String,
         maxTokens: Int = 400,
@@ -118,12 +119,13 @@ struct MLXChatService {
 
         let url = try makeURL(baseURL: baseURL, endpointPath: "/v1/chat/completions")
 
+        var apiMessages: [ChatCompletionMessage] = [.init(role: .system, content: systemPrompt)]
+        apiMessages += history.suffix(6).map { ChatCompletionMessage(role: $0.role, content: $0.content) }
+        apiMessages.append(.init(role: .user, content: question))
+
         let requestBody = ChatCompletionRequest(
             model: normalizedModelName,
-            messages: [
-                .init(role: .system, content: systemPrompt),
-                .init(role: .user, content: question)
-            ],
+            messages: apiMessages,
             temperature: 0.5,
             maxTokens: maxTokens,
             stream: false
