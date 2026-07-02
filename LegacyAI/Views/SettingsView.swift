@@ -29,8 +29,23 @@ struct SettingsView: View {
                         .textInputAutocapitalization(.never)
                         .keyboardType(.URL)
 
-                    TextField("Model name", text: $settings.modelName)
-                        .textInputAutocapitalization(.never)
+                    Picker("Chat model", selection: $settings.modelName) {
+                        ForEach(ModelSettings.supportedModels) { model in
+                            Text(model.displayName)
+                                .tag(model.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(selectedModel.description)
+                            .foregroundStyle(.secondary)
+
+                        Text(settings.modelName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
 
                     LabeledContent("Chat endpoint", value: chatEndpointText)
                         .font(.footnote)
@@ -67,7 +82,7 @@ struct SettingsView: View {
                             .foregroundStyle(connectionSucceeded ? .green : .red)
                     }
 
-                    Text("Your iPhone and Mac must be on the same Wi-Fi network. On the Mac, open System Settings > Wi-Fi > Details, or run `ipconfig getifaddr en0` in Terminal to find the LAN IP. Use it like `http://192.168.1.23:8080`. Do not use `127.0.0.1` on a real iPhone; that points to the phone, not the Mac. The model name must match the full id used by MLX, for example `mlx-community/Qwen2.5-Coder-14B-Instruct-4bit`.")
+                    Text("Your iPhone and Mac must be on the same Wi-Fi network. On the Mac, open System Settings > Wi-Fi > Details, or run `ipconfig getifaddr en0` in Terminal to find the LAN IP. Use it like `http://192.168.1.23:8080`. Do not use `127.0.0.1` on a real iPhone; that points to the phone, not the Mac. The selected chat model must match the model used to start the MLX server.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -82,6 +97,10 @@ struct SettingsView: View {
 
     private var chatEndpointText: String {
         chatService.chatCompletionsURLDescription(baseURL: settings.serverBaseURL)
+    }
+
+    private var selectedModel: ModelSettings.SupportedModel {
+        ModelSettings.supportedModel(for: settings.modelName)
     }
 
     @MainActor

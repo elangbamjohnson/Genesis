@@ -31,13 +31,26 @@ Do not enable blanket arbitrary loads.
 
 ## Local Model Server
 
-Run your OpenAI-compatible MLX server on the Mac, for example:
+Run your OpenAI-compatible MLX server on the Mac. Genesis currently supports these chat models:
+
+| Model | Use case | App model value |
+| --- | --- | --- |
+| Qwen2.5 14B Instruct | Default conversational legacy answers | `/Users/johnsonelangbam/.cache/huggingface/mlx-qwen25-14b-instruct` |
+| Qwen2.5 Coder 14B Instruct | Programming and technical explanations | `mlx-community/Qwen2.5-Coder-14B-Instruct-4bit` |
+
+For the default local Instruct model:
+
+```bash
+mlx_lm.server --host 0.0.0.0 --port 8080 --model ~/.cache/huggingface/mlx-qwen25-14b-instruct
+```
+
+For the Coder model:
 
 ```bash
 mlx_lm.server --host 0.0.0.0 --port 8080 --model mlx-community/Qwen2.5-Coder-14B-Instruct-4bit
 ```
 
-Use the same full model id in the app Settings screen. A shorthand like `qwen2.5-coder-14b` is not a Hugging Face repo id, so the server will return a repository-not-found error.
+Select the same model in the app Settings screen. The app can only talk to the model currently loaded by the MLX server. The app stores the expanded absolute path for local folders because `~` is only expanded by your shell.
 
 The iPhone and Mac must be on the same Wi-Fi network.
 

@@ -119,14 +119,25 @@ struct ChatView: View {
             from: archiveStore.entries
         )
         let sourceTitles = retrievedEntries.map(\.title)
+
+        messages.append(ChatMessage(role: .user, content: question))
+
+        guard !retrievedEntries.isEmpty else {
+            messages.append(
+                ChatMessage(
+                    role: .assistant,
+                    content: missingMemoryResponse()
+                )
+            )
+            return
+        }
+
         let systemPrompt = promptBuilder.buildSystemPrompt(
             personaName: settings.personaName,
             styleNotes: settings.styleNotes,
             memories: retrievedEntries
         )
         let userPrompt = promptBuilder.buildUserPrompt(question: question)
-
-        messages.append(ChatMessage(role: .user, content: question))
 
         do {
             statusMessage = "Waiting for local model. First response can take a while..."
@@ -156,6 +167,10 @@ struct ChatView: View {
     private func cancelSend() {
         statusMessage = "Cancelling..."
         sendTask?.cancel()
+    }
+
+    private func missingMemoryResponse() -> String {
+        "I could not find a saved memory that answers that yet. If you add or retag a memory about it in the Archive, I can answer from that record."
     }
 }
 

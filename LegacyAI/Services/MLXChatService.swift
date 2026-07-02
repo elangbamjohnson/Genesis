@@ -32,7 +32,7 @@ struct MLXChatService {
             case .httpStatus(let statusCode, let body):
                 "The local model server returned HTTP \(statusCode): \(body)"
             case .modelNotFound(let modelName):
-                "The local model server could not find `\(modelName)`. In Settings, use the full MLX/Hugging Face model id, such as `mlx-community/Qwen2.5-Coder-14B-Instruct-4bit`, and restart the MLX server with that same model."
+                "The local model server could not find `\(modelName)`. Choose a supported model in Settings and restart the MLX server with that same model id."
             case .missingAssistantMessage:
                 "The local model server did not return an assistant message."
             }
@@ -82,7 +82,7 @@ struct MLXChatService {
                 return "Connected. Server reports model `\(normalizedModelName)`."
             }
 
-            return "Connected. Server models: \(modelIDs.joined(separator: ", "))."
+            return "Connected, but the server is not serving the selected model. Selected: `\(normalizedModelName)`. Server models: \(modelIDs.joined(separator: ", "))."
         }
 
         return "Connected to the local model server."
