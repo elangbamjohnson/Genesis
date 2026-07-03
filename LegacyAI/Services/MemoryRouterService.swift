@@ -38,12 +38,14 @@ enum MemoryRouterService {
 
         Given the message and the index of saved memories below (titles, categories, and tags only), respond with ONLY a JSON object, no other text, no code fences, no explanation, in exactly this shape:
 
-        {"intent": "small_talk" | "specific" | "broad_overview" | "no_match", "relevant_ids": ["id1", "id2"]}
+        {"intent": "small_talk" | "specific" | "broad_overview" | "time_query" | "date_query" | "no_match", "relevant_ids": ["id1", "id2"]}
 
         Rules:
         - "small_talk": greetings, thanks, casual chat — no request for personal information.
         - "specific": a question about one or a few particular facts, stories, or topics. Put only the ids of memories genuinely relevant to what was asked in "relevant_ids".
         - "broad_overview": an open-ended request for a general picture of the person (e.g. "tell me about yourself", "tell me everything you remember", "who are you"). Include a diverse spread of relevant ids across different categories, up to 8.
+        - "time_query": the user is asking what the current real-world time is right now, however it's phrased (e.g. "what time is it", "check the time", "got the time?", "current time please"). This is never about a stored memory. Return an empty "relevant_ids" array.
+        - "date_query": the user is asking what today's real-world date or day is, however it's phrased. Never about a stored memory. Return an empty "relevant_ids" array.
         - "no_match": a specific question, but nothing in the index relates to it. Return an empty "relevant_ids" array.
         - Only ever include ids that literally appear in the index below. Never invent an id.
 
@@ -102,6 +104,12 @@ enum MemoryRouterService {
         case "broad_overview":
             intent = .broadOverview
             relevantIDs = decoded.relevant_ids.compactMap { UUID(uuidString: $0) }
+        case "time_query":
+            intent = .currentTime
+            relevantIDs = []
+        case "date_query":
+            intent = .currentDate
+            relevantIDs = []
         case "no_match":
             intent = .informationRequest
             relevantIDs = []
