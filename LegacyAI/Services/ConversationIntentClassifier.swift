@@ -11,6 +11,8 @@ enum ConversationIntent {
     case smallTalk
     case broadOverview
     case informationRequest
+    case currentTime
+    case currentDate
 }
 
 /// A lightweight, heuristic classifier — no ML, no network call.
@@ -30,6 +32,14 @@ enum ConversationIntentClassifier {
         
         if broadOverviewPhrases.contains(where: { matchesWholePhrase(normalized, phrase: $0) }) {
             return .broadOverview
+        }
+        
+        if timeFallbackPhrases.contains(where: { matchesWholePhrase(normalized, phrase: $0) }) {
+            return .currentTime
+        }
+
+        if dateFallbackPhrases.contains(where: { matchesWholePhrase(normalized, phrase: $0) }) {
+            return .currentDate
         }
 
         let words = normalized.split(separator: " ").map(String.init)
@@ -78,6 +88,17 @@ enum ConversationIntentClassifier {
         "what are you like", "describe yourself",
         "what is your story", "whats your story", "tell me your story",
         "give me an overview", "sum yourself up"
+    ]
+    
+    private static let timeFallbackPhrases: Set<String> = [
+        "what time is it", "whats the time", "what is the time",
+        "current time", "check the time", "got the time",
+        "tell me the time", "time now"
+    ]
+
+    private static let dateFallbackPhrases: Set<String> = [
+        "what date is it", "what day is it", "todays date",
+        "current date", "what is todays date", "what is today"
     ]
     
     private static let exactSmallTalkPhrases: Set<String> = [

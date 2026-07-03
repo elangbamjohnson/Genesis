@@ -40,5 +40,33 @@
       "birth place"
     ],
     "title": "Date and place of birth"
-  }
+  },
+  {
+      "category": "Other",
+      "content": "I attend my school at Donbosco Highschool Chingmeirong, Imphal, Manipur from Nursery to class 8. I started my school at around 1983 or 1984.",
+      "date": "2026-02-03T00:00:00Z",
+      "id": "DBC3BA73-0A36-4B31-AD3C-056F150DC6D4",
+      "tags": [
+          "biography",
+          "school",
+          "education",
+          "primary school",
+          "high school"
+      ],
+      "title": "My nursery and primary school"
+  },
+  {
+     "category": "Other",
+     "content": "After I finished my 12th, I studied BCA(Bachelor Of Computer Application) at National PG College at Guwahati. That was on the year 2000, it was a three year degree. After I completed BCA, I have enrolled to DOEACC for B-Level course for 1 year, at the meantime I was selected to study for MCA(Masters of Computer Application) at Manipur University, so I quit the B-Level at DOEACC and started my MCA course at Manipur University. it was 2004 when I started my MCA at Manipur University, the course was completed at June 2007.",
+     "date": "2026-02-05T00:00:00Z",
+     "id": "A790DC75-5498-419F-BADC-85F90759C298",
+     "tags": [
+       "biography",
+       "college",
+       "university",
+       "education",
+       "degree"
+     ],
+     "title": "My college or university"
+   }
 ]
