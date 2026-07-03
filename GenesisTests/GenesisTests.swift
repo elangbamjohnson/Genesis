@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import Genesis
 
+@MainActor
 struct GenesisTests {
-    @MainActor
     @Test func retrievesChildhoodEntriesByCategory() {
         let childhoodEntry = LifeEntry(
             title: "A lane near home",
@@ -26,7 +26,6 @@ struct GenesisTests {
         #expect(results.first?.id == childhoodEntry.id)
     }
 
-    @MainActor
     @Test func retrievesChildhoodEntriesByRelatedWording() {
         let entry = LifeEntry(
             title: "Growing up near the river",
@@ -42,7 +41,6 @@ struct GenesisTests {
         #expect(results.map(\.id) == [entry.id])
     }
 
-    @MainActor
     @Test func returnsNoEntriesWhenNothingMatches() {
         let entry = LifeEntry(
             title: "Work lesson",
@@ -58,7 +56,6 @@ struct GenesisTests {
         #expect(results.isEmpty)
     }
 
-    @MainActor
     @Test func retrievesDirectSchoolMemory() {
         let schoolEntry = LifeEntry(
             title: "School assembly",
@@ -79,7 +76,6 @@ struct GenesisTests {
         #expect(results.first?.id == schoolEntry.id)
     }
 
-    @MainActor
     @Test func doesNotUseBroadChildhoodMatchForSpecificSchoolQuestion() {
         let unrelatedEntry = LifeEntry(
             title: "Young days at home",
@@ -148,5 +144,52 @@ struct GenesisTests {
 
     @Test func parsesInvalidRouterJSONAsNil() {
         #expect(MemoryRouterService.parseDecision(from: "not json") == nil)
+    }
+
+    @Test func classifiesWhatTimeIsItAsCurrentTime() {
+        #expect(ConversationIntentClassifier.classify("what time is it") == .currentTime)
+        #expect(ConversationIntentClassifier.classify("got the time") == .currentTime)
+    }
+
+    @Test func classifiesWhatDayIsItAsCurrentDate() {
+        #expect(ConversationIntentClassifier.classify("what day is it") == .currentDate)
+    }
+
+    @Test func doesNotClassifyBirthDateQuestionAsCurrentDate() {
+        #expect(
+            ConversationIntentClassifier.classify("what date of birth") == .informationRequest
+        )
+    }
+
+    @Test func doesNotClassifySchoolTimeQuestionAsCurrentTime() {
+        #expect(
+            ConversationIntentClassifier.classify("what time did school start") == .informationRequest
+        )
+    }
+
+    @Test func parsesRouterTimeQueryJSON() {
+        let decision = MemoryRouterService.parseDecision(
+            from: #"{"intent": "time_query", "relevant_ids": []}"#
+        )
+        #expect(decision?.intent == .currentTime)
+        #expect(decision?.relevantEntryIDs.isEmpty == true)
+    }
+
+    @Test func parsesRouterDateQueryJSON() {
+        let decision = MemoryRouterService.parseDecision(
+            from: #"{"intent": "date_query", "relevant_ids": []}"#
+        )
+        #expect(decision?.intent == .currentDate)
+        #expect(decision?.relevantEntryIDs.isEmpty == true)
+    }
+
+    @Test func systemQueryHandlerIncludesFormattedTime() {
+        let answer = SystemQueryHandler.currentTimeAnswer()
+        #expect(!answer.isEmpty)
+    }
+
+    @Test func systemQueryHandlerIncludesFormattedDate() {
+        let answer = SystemQueryHandler.currentDateAnswer()
+        #expect(!answer.isEmpty)
     }
 }

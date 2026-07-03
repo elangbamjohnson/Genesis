@@ -36,7 +36,7 @@ struct ChatView: View {
 
                 inputBar
             }
-            .navigationTitle("Legacy Chat")
+            .navigationTitle("Project Genesis")
         }
     }
 
@@ -191,6 +191,8 @@ struct ChatView: View {
                 retrievedEntries = []
             case .broadOverview:
                 retrievedEntries = retrievalEngine.retrieveOverviewEntries(from: archiveStore.entries)
+            case .currentTime, .currentDate:
+                retrievedEntries = []
             case .informationRequest:
                 retrievedEntries = retrievalEngine.retrieveRelevantEntries(
                     for: question,
@@ -198,10 +200,20 @@ struct ChatView: View {
                 )
             }
         }
-        
+
         let sourceTitles = retrievedEntries.map(\.title)
 
         messages.append(ChatMessage(role: .user, content: question))
+
+        // Time/date questions never go to the model — the LLM only identified the
+        // intent, the actual answer always comes straight from the device clock.
+        if intent == .currentTime || intent == .currentDate {
+            let answer = intent == .currentTime
+                ? SystemQueryHandler.currentTimeAnswer()
+                : SystemQueryHandler.currentDateAnswer()
+            messages.append(ChatMessage(role: .assistant, content: answer))
+            return
+        }
 
         if intent == .informationRequest, retrievedEntries.isEmpty {
             messages.append(
