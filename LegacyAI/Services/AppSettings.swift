@@ -7,6 +7,10 @@ final class AppSettings: ObservableObject {
         didSet { save() }
     }
 
+    @Published var backendBaseURL: String {
+        didSet { save() }
+    }
+
     @Published var modelName: String {
         didSet { save() }
     }
@@ -21,6 +25,7 @@ final class AppSettings: ObservableObject {
 
     private enum Key {
         static let serverBaseURL = "serverBaseURL"
+        static let backendBaseURL = "backendBaseURL"
         static let modelName = "modelName"
         static let personaName = "personaName"
         static let styleNotes = "styleNotes"
@@ -31,6 +36,7 @@ final class AppSettings: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         serverBaseURL = defaults.string(forKey: Key.serverBaseURL) ?? "http://192.168.29.164:8080"
+        backendBaseURL = defaults.string(forKey: Key.backendBaseURL) ?? "http://192.168.29.164:8090"
 
         let normalizedModelName = ModelSettings.normalizedModelName(
             defaults.string(forKey: Key.modelName) ?? ""
@@ -49,6 +55,7 @@ final class AppSettings: ObservableObject {
 
     private func save() {
         defaults.set(serverBaseURL, forKey: Key.serverBaseURL)
+        defaults.set(backendBaseURL, forKey: Key.backendBaseURL)
         defaults.set(modelName, forKey: Key.modelName)
         defaults.set(personaName, forKey: Key.personaName)
         defaults.set(styleNotes, forKey: Key.styleNotes)

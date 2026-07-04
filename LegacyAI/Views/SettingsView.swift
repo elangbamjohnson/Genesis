@@ -8,10 +8,19 @@ struct SettingsView: View {
     @State private var isTestingChat = false
     @State private var connectionMessage: String?
     @State private var connectionSucceeded = false
+    
+    @State private var isTestingBackend = false
+    @State private var backendMessage: String?
+    @State private var backendSucceeded = false
+
+    @State private var isPushingArchive = false
+    @State private var pushMessage: String?
+
     @State private var sampleImportMessage: String?
     @State private var sampleImportSucceeded = false
 
     private let chatService = MLXChatService()
+    private let backendClient = BackendClient()
 
     var body: some View {
         NavigationStack {
@@ -89,6 +98,54 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Section("Backend Database") {
+                    TextField("Backend address", text: $settings.backendBaseURL)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+
+                    Button {
+                        Task {
+                            await testBackendConnection()
+                        }
+                    } label: {
+                        if isTestingBackend {
+                            ProgressView()
+                        } else {
+                            Text("Test connection")
+                        }
+                    }
+                    .disabled(isTestingBackend)
+
+                    Button {
+                        Task {
+                            await pushArchiveToBackend()
+                        }
+                    } label: {
+                        if isPushingArchive {
+                            ProgressView()
+                        } else {
+                            Text("Push local archive to backend")
+                        }
+                    }
+                    .disabled(isPushingArchive)
+
+                    if let backendMessage {
+                        Text(backendMessage)
+                            .font(.footnote)
+                            .foregroundStyle(backendSucceeded ? .green : .red)
+                    }
+
+                    if let pushMessage {
+                        Text(pushMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.green)
+                    }
+
+                    Text("The app communicates directly with the Python/FastAPI server. Use your Mac's LAN IP address with port 8090, e.g., `http://192.168.1.23:8090`.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("Archive") {
                     LabeledContent("Memory entries", value: "\(archiveStore.entries.count)")
 
@@ -158,20 +215,60 @@ struct SettingsView: View {
     }
 
     @MainActor
-    private func importSampleMemories() {
+    private func testBackendConnection() async {
+        isTestingBackend = true
+        backendMessage = nil
+        defer { isTestingBackend = false }
+
         do {
-            let importCount = try archiveStore.importSeedEntries()
-            sampleImportSucceeded = true
-            if importCount == 0 {
-                sampleImportMessage = "No new bundled sample memories found."
-            } else if importCount == 1 {
-                sampleImportMessage = "Loaded 1 bundled sample memory."
+            let healthy = try await backendClient.checkHealth(baseURL: settings.backendBaseURL)
+            if healthy {
+                backendMessage = "Connected. Backend is reachable."
+                backendSucceeded = true
             } else {
-                sampleImportMessage = "Loaded \(importCount) bundled sample memories."
+                backendMessage = "Backend connected but health check returned non-200 response."
+                backendSucceeded = false
             }
         } catch {
-            sampleImportSucceeded = false
-            sampleImportMessage = error.localizedDescription
+            backendMessage = error.localizedDescription
+            backendSucceeded = false
+        }
+    }
+
+    @MainActor
+    private func pushArchiveToBackend() async {
+        isPushingArchive = true
+        pushMessage = nil
+        backendMessage = nil
+        defer { isPushingArchive = false }
+
+        do {
+            let result = try await archiveStore.pushArchiveToBackend(baseURL: settings.backendBaseURL)
+            pushMessage = "Successfully pushed! Imported: \(result.imported), Skipped: \(result.skipped), Failed: \(result.failed)."
+        } catch {
+            backendMessage = "Failed to push archive: \(error.localizedDescription)"
+            backendSucceeded = false
+        }
+    }
+
+    @MainActor
+    private func importSampleMemories() {
+        sampleImportMessage = nil
+        Task {
+            do {
+                let importCount = try await archiveStore.importSeedEntries(baseURL: settings.backendBaseURL)
+                sampleImportSucceeded = true
+                if importCount == 0 {
+                    sampleImportMessage = "No new bundled sample memories found."
+                } else if importCount == 1 {
+                    sampleImportMessage = "Loaded 1 bundled sample memory."
+                } else {
+                    sampleImportMessage = "Loaded \(importCount) bundled sample memories."
+                }
+            } catch {
+                sampleImportSucceeded = false
+                sampleImportMessage = error.localizedDescription
+            }
         }
     }
 }
