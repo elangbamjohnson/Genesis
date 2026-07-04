@@ -10,6 +10,9 @@ struct LegacyAIApp: App {
             ContentView()
                 .environmentObject(archiveStore)
                 .environmentObject(settings)
+                .task {
+                    await archiveStore.load(baseURL: settings.backendBaseURL)
+                }
         }
     }
 }

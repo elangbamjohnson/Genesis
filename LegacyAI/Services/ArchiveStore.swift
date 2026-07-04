@@ -10,11 +10,12 @@ struct ImportSummary: Equatable {
 @MainActor
 final class ArchiveStore: ObservableObject {
     @Published private(set) var entries: [LifeEntry] = []
-    @Published private(set) var loadError: String?
+    @Published var loadError: String?
 
     private let fileManager: FileManager
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
+    private let client = BackendClient()
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -34,8 +35,9 @@ final class ArchiveStore: ObservableObject {
         content: String,
         category: LifeEntry.Category,
         tags: [String],
-        date: Date
-    ) {
+        date: Date,
+        baseURL: String
+    ) async throws {
         let entry = LifeEntry(
             title: title,
             content: content,
@@ -44,16 +46,20 @@ final class ArchiveStore: ObservableObject {
             date: date
         )
 
-        entries.insert(entry, at: 0)
-        save()
+        let created = try await client.createMemory(entry, baseURL: baseURL)
+        entries.insert(created, at: 0)
+        saveLocalCache(entries)
     }
 
-    func deleteEntries(withIDs ids: Set<LifeEntry.ID>) {
+    func deleteEntries(withIDs ids: Set<LifeEntry.ID>, baseURL: String) async throws {
+        for id in ids {
+            try await client.deleteMemory(id: id, baseURL: baseURL)
+        }
         entries.removeAll { ids.contains($0.id) }
-        save()
+        saveLocalCache(entries)
     }
 
-    func importFiles(from urls: [URL]) async -> ImportSummary {
+    func importFiles(from urls: [URL], baseURL: String) async -> ImportSummary {
         var importedEntries: [LifeEntry] = []
         var failedFileNames: [String] = []
 
@@ -68,22 +74,22 @@ final class ArchiveStore: ObservableObject {
             do {
                 let content = try String(contentsOf: url, encoding: .utf8)
                 let title = url.deletingPathExtension().lastPathComponent
-                importedEntries.append(
-                    LifeEntry(
-                        title: title,
-                        content: content,
-                        category: .imported,
-                        tags: [],
-                        date: Date()
-                    )
+                let entry = LifeEntry(
+                    title: title,
+                    content: content,
+                    category: .imported,
+                    tags: [],
+                    date: Date()
                 )
+                let created = try await client.createMemory(entry, baseURL: baseURL)
+                importedEntries.append(created)
             } catch {
                 failedFileNames.append(url.lastPathComponent)
             }
         }
 
         entries.insert(contentsOf: importedEntries, at: 0)
-        save()
+        saveLocalCache(entries)
 
         return ImportSummary(
             importedCount: importedEntries.count,
@@ -92,7 +98,7 @@ final class ArchiveStore: ObservableObject {
     }
 
     @discardableResult
-    func importSeedEntries() throws -> Int {
+    func importSeedEntries(baseURL: String) async throws -> Int {
         let seedEntries = try loadSeedEntries()
         let existingIDs = Set(entries.map(\.id))
         let newEntries = seedEntries.filter { !existingIDs.contains($0.id) }
@@ -101,34 +107,61 @@ final class ArchiveStore: ObservableObject {
             return 0
         }
 
-        entries.insert(contentsOf: newEntries, at: 0)
-        save()
-
-        return newEntries.count
+        let result = try await client.importEntries(newEntries, baseURL: baseURL, overwrite: false)
+        
+        // Reload all to get updated list
+        try await load(baseURL: baseURL)
+        return result.imported
     }
 
-    private func load() async {
-        do {
-            let archiveURL = try archiveFileURL()
-            if fileManager.fileExists(atPath: archiveURL.path) {
-                let data = try Data(contentsOf: archiveURL)
-                entries = try decoder.decode([LifeEntry].self, from: data)
-            } else {
-                entries = try loadSeedEntries()
-                save()
+    func pushArchiveToBackend(baseURL: String) async throws -> BackendClient.ImportResult {
+        let localEntries = try loadLocalCacheEntries()
+        let result = try await client.importEntries(localEntries, baseURL: baseURL, overwrite: false)
+        try await load(baseURL: baseURL)
+        return result
+    }
+
+    func load(baseURL: String? = nil) async {
+        if let baseURL = baseURL, !baseURL.isEmpty {
+            do {
+                let fetched = try await client.fetchMemories(baseURL: baseURL)
+                self.entries = fetched
+                saveLocalCache(fetched)
+                self.loadError = nil
+            } catch {
+                self.loadError = "Offline mode: \(error.localizedDescription)"
+                await loadLocalCache()
             }
-        } catch {
-            loadError = error.localizedDescription
+        } else {
+            await loadLocalCache()
         }
     }
 
-    private func save() {
+    private func loadLocalCache() async {
+        if let local = try? loadLocalCacheEntries() {
+            self.entries = local
+        } else {
+            self.entries = (try? loadSeedEntries()) ?? []
+            saveLocalCache(entries)
+        }
+    }
+
+    private func loadLocalCacheEntries() throws -> [LifeEntry] {
+        let archiveURL = try archiveFileURL()
+        if fileManager.fileExists(atPath: archiveURL.path) {
+            let data = try Data(contentsOf: archiveURL)
+            return try decoder.decode([LifeEntry].self, from: data)
+        }
+        return []
+    }
+
+    private func saveLocalCache(_ newEntries: [LifeEntry]) {
         do {
             let archiveURL = try archiveFileURL()
-            let data = try encoder.encode(entries)
+            let data = try encoder.encode(newEntries)
             try data.write(to: archiveURL, options: [.atomic])
         } catch {
-            loadError = error.localizedDescription
+            loadError = "Cache write failed: \(error.localizedDescription)"
         }
     }
 
