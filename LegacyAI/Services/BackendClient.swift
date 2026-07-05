@@ -36,10 +36,67 @@ struct BackendClient {
         let failed: Int
     }
 
+    struct ChatTurn: Codable {
+        let role: String
+        let content: String
+    }
+
+    private struct ChatRequestPayload: Codable {
+        let question: String
+        let history: [ChatTurn]
+    }
+
+    struct ChatReply: Decodable {
+        let answer: String
+        let sourceTitles: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case answer
+            case sourceTitles = "source_titles"
+        }
+    }
+
     private let session: URLSession
 
     init(session: URLSession = .shared) {
         self.session = session
+    }
+
+    func sendChat(question: String, history: [ChatTurn], baseURL: String) async throws -> ChatReply {
+        let url = try makeURL(baseURL: baseURL, endpointPath: "/v1/chat")
+        try validateReachableHost(url.host)
+
+        let payload = ChatRequestPayload(question: question, history: history)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 120
+        request.httpBody = try makeEncoder().encode(payload)
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch let error as URLError {
+            throw clientError(for: error, url: url)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ClientError.invalidResponse
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw ClientError.httpStatus(httpResponse.statusCode, body)
+        }
+
+        do {
+            return try makeDecoder().decode(ChatReply.self, from: data)
+        } catch {
+            throw ClientError.serializationError(error.localizedDescription)
+        }
     }
 
     // Helper decoder with robust date parsing

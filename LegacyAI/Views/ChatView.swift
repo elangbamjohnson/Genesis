@@ -12,9 +12,7 @@ struct ChatView: View {
     @State private var sendTask: Task<Void, Never>?
     @FocusState private var isInputFocused: Bool
 
-    private let retrievalEngine = RetrievalEngine()
-    private let promptBuilder = PersonaPromptBuilder()
-    private let chatService = MLXChatService()
+    private let backendClient = BackendClient()
 
     var body: some View {
         NavigationStack {
@@ -158,110 +156,33 @@ struct ChatView: View {
         errorMessage = nil
         draft = ""
         isLoading = true
-        statusMessage = "Checking local server..."
+        statusMessage = "Asking Genesis..."
         defer {
             isLoading = false
             statusMessage = ""
             sendTask = nil
         }
 
-        statusMessage = "Working out what you're asking..."
-        let routeDecision = await MemoryRouterService.route(
-            question: question,
-            entries: archiveStore.entries,
-            chatService: chatService,
-            baseURL: settings.serverBaseURL,
-            modelName: settings.modelName
-        )
-
-        let intent: ConversationIntent
-        let retrievedEntries: [LifeEntry]
-
-        if let routeDecision {
-            // The model itself judged intent and relevance.
-            intent = routeDecision.intent
-            let idSet = Set(routeDecision.relevantEntryIDs)
-            retrievedEntries = archiveStore.entries.filter { idSet.contains($0.id) }
-        } else {
-            // Router failed or returned something unparseable — fall back to the
-            // original keyword-based system so the chat still works.
-            intent = ConversationIntentClassifier.classify(question)
-            switch intent {
-            case .smallTalk:
-                retrievedEntries = []
-            case .broadOverview:
-                retrievedEntries = retrievalEngine.retrieveOverviewEntries(from: archiveStore.entries)
-            case .currentTime, .currentDate:
-                retrievedEntries = []
-            case .informationRequest:
-                retrievedEntries = retrievalEngine.retrieveRelevantEntries(
-                    for: question,
-                    from: archiveStore.entries
-                )
-            }
+        // Build history BEFORE appending the new question -- the backend
+        // treats `question` as the current turn and `history` as everything
+        // that came before it.
+        let history = messages.map {
+            BackendClient.ChatTurn(role: $0.role.rawValue, content: $0.content)
         }
-
-        let sourceTitles = retrievedEntries.map(\.title)
 
         messages.append(ChatMessage(role: .user, content: question))
 
-        // Time/date questions never go to the model — the LLM only identified the
-        // intent, the actual answer always comes straight from the device clock.
-        if intent == .currentTime || intent == .currentDate {
-            let answer = intent == .currentTime
-                ? SystemQueryHandler.currentTimeAnswer()
-                : SystemQueryHandler.currentDateAnswer()
-            messages.append(ChatMessage(role: .assistant, content: answer))
-            return
-        }
-
-        if intent == .informationRequest, retrievedEntries.isEmpty {
-            messages.append(
-                ChatMessage(
-                    role: .assistant,
-                    content: missingMemoryResponse()
-                )
-            )
-            return
-        }
-
-        let systemPrompt: String
-        if intent == .smallTalk {
-            systemPrompt = promptBuilder.buildSmallTalkSystemPrompt(
-                personaName: settings.personaName,
-                styleNotes: settings.styleNotes
-            )
-        } else {
-            systemPrompt = promptBuilder.buildSystemPrompt(
-                personaName: settings.personaName,
-                styleNotes: settings.styleNotes,
-                memories: retrievedEntries
-            )
-        }
-        let userPrompt: String
-        if intent == .smallTalk {
-            userPrompt = promptBuilder.buildSmallTalkUserPrompt(question: question)
-        } else {
-            userPrompt = promptBuilder.buildUserPrompt(question: question)
-        }
-        let history = Array(messages.dropLast())
-
         do {
-            statusMessage = "Waiting for local model. First response can take a while..."
-            let answer = try await chatService.send(
-                question: userPrompt,
-                systemPrompt: systemPrompt,
+            let reply = try await backendClient.sendChat(
+                question: question,
                 history: history,
-                baseURL: settings.serverBaseURL,
-                modelName: settings.modelName,
-                maxTokens: 400,
-                timeoutInterval: 120
+                baseURL: settings.backendBaseURL
             )
             messages.append(
                 ChatMessage(
                     role: .assistant,
-                    content: answer,
-                    sourceEntryTitles: sourceTitles
+                    content: reply.answer,
+                    sourceEntryTitles: reply.sourceTitles
                 )
             )
         } catch is CancellationError {
@@ -275,10 +196,6 @@ struct ChatView: View {
     private func cancelSend() {
         statusMessage = "Cancelling..."
         sendTask?.cancel()
-    }
-
-    private func missingMemoryResponse() -> String {
-        "I could not find a saved memory that answers that yet. If you add or retag a memory about it in the Archive, I can answer from that record."
     }
 }
 
