@@ -49,7 +49,7 @@ struct ChatView: View {
             Text("Add memories first")
                 .font(.title3.bold())
 
-            Text("Use the Archive tab to write memories or import .txt/.md files. Answers are grounded only in saved memories.")
+            Text("Add memories in Settings or through the backend admin page. Answers are grounded only in saved memories.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

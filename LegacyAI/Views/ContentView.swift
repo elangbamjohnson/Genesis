@@ -8,11 +8,6 @@ struct ContentView: View {
                     Label("Chat", systemImage: "message")
                 }
 
-            EntryListView()
-                .tabItem {
-                    Label("Archive", systemImage: "tray.full")
-                }
-
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")

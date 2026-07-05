@@ -16,25 +16,12 @@ struct SettingsView: View {
     @State private var isPushingArchive = false
     @State private var pushMessage: String?
 
-    @State private var sampleImportMessage: String?
-    @State private var sampleImportSucceeded = false
-
     private let chatService = MLXChatService()
     private let backendClient = BackendClient()
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Persona") {
-                    TextField("Persona name", text: $settings.personaName)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Voice and style notes")
-                        TextEditor(text: $settings.styleNotes)
-                            .frame(minHeight: 140)
-                    }
-                }
-
                 Section("Local model server") {
                     TextField("Server address", text: $settings.serverBaseURL)
                         .textInputAutocapitalization(.never)
@@ -145,26 +132,6 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-
-                Section("Archive") {
-                    LabeledContent("Memory entries", value: "\(archiveStore.entries.count)")
-
-                    Button("Load bundled sample memories") {
-                        importSampleMemories()
-                    }
-
-                    if let sampleImportMessage {
-                        Text(sampleImportMessage)
-                            .font(.footnote)
-                            .foregroundStyle(sampleImportSucceeded ? .green : .red)
-                    }
-
-                    if let loadError = archiveStore.loadError {
-                        Text(loadError)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
-                }
             }
             .navigationTitle("Settings")
         }
@@ -248,27 +215,6 @@ struct SettingsView: View {
         } catch {
             backendMessage = "Failed to push archive: \(error.localizedDescription)"
             backendSucceeded = false
-        }
-    }
-
-    @MainActor
-    private func importSampleMemories() {
-        sampleImportMessage = nil
-        Task {
-            do {
-                let importCount = try await archiveStore.importSeedEntries(baseURL: settings.backendBaseURL)
-                sampleImportSucceeded = true
-                if importCount == 0 {
-                    sampleImportMessage = "No new bundled sample memories found."
-                } else if importCount == 1 {
-                    sampleImportMessage = "Loaded 1 bundled sample memory."
-                } else {
-                    sampleImportMessage = "Loaded \(importCount) bundled sample memories."
-                }
-            } catch {
-                sampleImportSucceeded = false
-                sampleImportMessage = error.localizedDescription
-            }
         }
     }
 }
