@@ -14,6 +14,8 @@ struct ChatView: View {
 
     private let backendClient = BackendClient()
 
+    @State private var completedTypingIDs = Set<UUID>()
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -61,8 +63,17 @@ struct ChatView: View {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     ForEach(messages) { message in
-                        ChatBubble(message: message)
-                            .id(message.id)
+                        ChatBubble(
+                            message: message,
+                            shouldTypewrite: message.role == .assistant && !completedTypingIDs.contains(message.id),
+                            onTypingComplete: {
+                                completedTypingIDs.insert(message.id)
+                            },
+                            onTypingUpdate: {
+                                scrollToBottom(proxy: proxy, animated: false)
+                            }
+                        )
+                        .id(message.id)
                     }
 
                     if isLoading {
@@ -201,6 +212,9 @@ struct ChatView: View {
 
 private struct ChatBubble: View {
     let message: ChatMessage
+    let shouldTypewrite: Bool
+    let onTypingComplete: () -> Void
+    let onTypingUpdate: () -> Void
 
     var body: some View {
         HStack {
@@ -209,10 +223,19 @@ private struct ChatBubble: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(message.content)
-                    .foregroundStyle(message.role == .user ? .white : .primary)
+                if shouldTypewrite {
+                    TypewriterText(
+                        text: message.content,
+                        onUpdate: onTypingUpdate,
+                        onComplete: onTypingComplete
+                    )
+                    .foregroundStyle(.primary)
+                } else {
+                    Text(message.content)
+                        .foregroundStyle(message.role == .user ? .white : .primary)
+                }
 
-                if message.role == .assistant, !message.sourceEntryTitles.isEmpty {
+                if message.role == .assistant, !message.sourceEntryTitles.isEmpty, !shouldTypewrite {
                     Text("From: \(message.sourceEntryTitles.joined(separator: ", "))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -226,5 +249,37 @@ private struct ChatBubble: View {
                 Spacer(minLength: 40)
             }
         }
+    }
+}
+
+private struct TypewriterText: View {
+    let text: String
+    var characterDelayNanoseconds: UInt64 = 18_000_000
+    var onUpdate: () -> Void = {}
+    var onComplete: () -> Void = {}
+
+    @State private var displayedText = ""
+
+    var body: some View {
+        Text(displayedText)
+            .task(id: text) {
+                displayedText = ""
+                var charactersSinceUpdate = 0
+
+                for character in text {
+                    try? await Task.sleep(nanoseconds: characterDelayNanoseconds)
+                    if Task.isCancelled { return }
+
+                    displayedText.append(character)
+                    charactersSinceUpdate += 1
+                    if charactersSinceUpdate >= 8 {
+                        onUpdate()
+                        charactersSinceUpdate = 0
+                    }
+                }
+
+                onUpdate()
+                onComplete()
+            }
     }
 }
