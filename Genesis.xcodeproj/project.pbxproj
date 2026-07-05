@@ -55,31 +55,6 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		23E3CF742FF575FA0050B139 /* Core */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Core;
-			sourceTree = "<group>";
-		};
-		23E3CF762FF575FA0050B139 /* Resources */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Resources;
-			sourceTree = "<group>";
-		};
-		23E3CF962FF57CD40050B139 /* Services */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Services;
-			sourceTree = "<group>";
-		};
-		23E3CF972FF57CD40050B139 /* Backend */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Backend;
-			sourceTree = "<group>";
-		};
-		23E3CF982FF57CD40050B139 /* Docs */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Docs;
-			sourceTree = "<group>";
-		};
 		23E3CF992FF57CD40050B139 /* LegacyAI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -119,15 +94,10 @@
 			isa = PBXGroup;
 			children = (
 				23E3CF732FF575FA0050B139 /* App */,
-				23E3CF972FF57CD40050B139 /* Backend */,
-				23E3CF742FF575FA0050B139 /* Core */,
-				23E3CF982FF57CD40050B139 /* Docs */,
 				23E3CF592FF575FA0050B139 /* GenesisTests */,
 				23E3CF632FF575FA0050B139 /* GenesisUITests */,
 				23E3CF992FF57CD40050B139 /* LegacyAI */,
-				23E3CF762FF575FA0050B139 /* Resources */,
 				23E3CF4A2FF575F90050B139 /* Products */,
-				23E3CF962FF57CD40050B139 /* Services */,
 			);
 			sourceTree = "<group>";
 		};
@@ -158,9 +128,6 @@
 			);
 			fileSystemSynchronizedGroups = (
 				23E3CF732FF575FA0050B139 /* App */,
-				23E3CF742FF575FA0050B139 /* Core */,
-				23E3CF762FF575FA0050B139 /* Resources */,
-				23E3CF962FF57CD40050B139 /* Services */,
 				23E3CF992FF57CD40050B139 /* LegacyAI */,
 			);
 			name = Genesis;
