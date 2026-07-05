@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct ImportEntriesView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var archiveStore: ArchiveStore
+    @EnvironmentObject private var settings: AppSettings
 
     @State private var isShowingImporter = false
     @State private var importSummary: ImportSummary?
@@ -73,7 +74,7 @@ struct ImportEntriesView: View {
     private func handleImport(_ result: Result<[URL], Error>) async {
         do {
             let urls = try result.get()
-            importSummary = await archiveStore.importFiles(from: urls)
+            importSummary = await archiveStore.importFiles(from: urls, baseURL: settings.backendBaseURL)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription

@@ -2,10 +2,12 @@ import SwiftUI
 
 struct EntryListView: View {
     @EnvironmentObject private var archiveStore: ArchiveStore
+    @EnvironmentObject private var settings: AppSettings
 
     @State private var searchText = ""
     @State private var isShowingAddEntry = false
     @State private var isShowingImport = false
+    @State private var deleteError: String?
 
     private var filteredEntries: [LifeEntry] {
         guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -59,12 +61,28 @@ struct EntryListView: View {
             .sheet(isPresented: $isShowingImport) {
                 ImportEntriesView()
             }
+            .alert("Delete Failed", isPresented: Binding(
+                get: { deleteError != nil },
+                set: { if !$0 { deleteError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                if let deleteError {
+                    Text(deleteError)
+                }
+            }
         }
     }
 
     private func delete(at offsets: IndexSet) {
         let ids = Set(offsets.map { filteredEntries[$0].id })
-        archiveStore.deleteEntries(withIDs: ids)
+        Task {
+            do {
+                try await archiveStore.deleteEntries(withIDs: ids, baseURL: settings.backendBaseURL)
+            } catch {
+                deleteError = "Failed to delete from backend: \(error.localizedDescription)"
+            }
+        }
     }
 }
 
