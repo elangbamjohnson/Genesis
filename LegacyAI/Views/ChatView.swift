@@ -3,8 +3,8 @@ import SwiftUI
 struct ChatView: View {
     @EnvironmentObject private var archiveStore: ArchiveStore
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var chatStore: ChatStore
 
-    @State private var messages: [ChatMessage] = []
     @State private var draft = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -19,7 +19,7 @@ struct ChatView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if archiveStore.entries.isEmpty && messages.isEmpty {
+                if archiveStore.entries.isEmpty && chatStore.messages.isEmpty {
                     emptyState
                 } else {
                     messageList
@@ -49,7 +49,7 @@ struct ChatView: View {
             Text("Add memories first")
                 .font(.title3.bold())
 
-            Text("Add memories in Settings or through the backend admin page. Answers are grounded only in saved memories.")
+            Text("Add memories through the backend admin page. Answers are grounded only in saved memories.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -62,7 +62,7 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 12) {
-                    ForEach(messages) { message in
+                    ForEach(chatStore.messages) { message in
                         ChatBubble(
                             message: message,
                             shouldTypewrite: message.role == .assistant && !completedTypingIDs.contains(message.id),
@@ -87,7 +87,7 @@ struct ChatView: View {
                 }
                 .padding()
             }
-            .onChange(of: messages.count) { _ in
+            .onChange(of: chatStore.messages.count) { _ in
                 scrollToBottom(proxy: proxy, animated: true)
             }
             .onChange(of: isLoading) { _ in
@@ -174,14 +174,12 @@ struct ChatView: View {
             sendTask = nil
         }
 
-        // Build history BEFORE appending the new question -- the backend
+        // Build history BEFORE appending the new question — the backend
         // treats `question` as the current turn and `history` as everything
-        // that came before it.
-        let history = messages.map {
-            BackendClient.ChatTurn(role: $0.role.rawValue, content: $0.content)
-        }
+        // that came before it (last 8 turns, user + assistant).
+        let history = chatStore.historyForAPI()
 
-        messages.append(ChatMessage(role: .user, content: question))
+        chatStore.appendUserMessage(question)
 
         do {
             let reply = try await backendClient.sendChat(
@@ -189,13 +187,7 @@ struct ChatView: View {
                 history: history,
                 baseURL: settings.backendBaseURL
             )
-            messages.append(
-                ChatMessage(
-                    role: .assistant,
-                    content: reply.answer,
-                    sourceEntryTitles: reply.sourceTitles
-                )
-            )
+            chatStore.appendAssistantMessage(reply.answer, sourceTitles: reply.sourceTitles)
         } catch is CancellationError {
             errorMessage = "The chat request was cancelled."
         } catch {

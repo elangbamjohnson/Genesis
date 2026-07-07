@@ -60,6 +60,8 @@ playground.xcworkspace
 
 # Editor / IDE
 .idea/
+.cursor/
+.vscode/
 *.swp
 *.swo
 *~
