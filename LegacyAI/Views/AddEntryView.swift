@@ -4,6 +4,7 @@ struct AddEntryView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var archiveStore: ArchiveStore
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var sessionManager: SessionManager
 
     @State private var title = ""
     @State private var category = LifeEntry.Category.other
@@ -80,7 +81,8 @@ struct AddEntryView: View {
                     category: category,
                     tags: parsedTags,
                     date: date,
-                    baseURL: settings.backendBaseURL
+                    baseURL: settings.backendBaseURL,
+                    authToken: sessionManager.currentSession?.token ?? ""
                 )
                 dismiss()
             } catch {

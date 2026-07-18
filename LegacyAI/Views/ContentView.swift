@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject private var sessionManager: SessionManager
+    @EnvironmentObject private var chatStore: ChatStore
+
     var body: some View {
         TabView {
             ChatView()
@@ -14,10 +17,4 @@ struct ContentView: View {
                 }
         }
     }
-}
-
-#Preview {
-    ContentView()
-        .environmentObject(ArchiveStore())
-        .environmentObject(AppSettings())
 }

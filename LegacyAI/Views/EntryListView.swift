@@ -3,6 +3,7 @@ import SwiftUI
 struct EntryListView: View {
     @EnvironmentObject private var archiveStore: ArchiveStore
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var sessionManager: SessionManager
 
     @State private var searchText = ""
     @State private var isShowingAddEntry = false
@@ -78,7 +79,7 @@ struct EntryListView: View {
         let ids = Set(offsets.map { filteredEntries[$0].id })
         Task {
             do {
-                try await archiveStore.deleteEntries(withIDs: ids, baseURL: settings.backendBaseURL)
+                try await archiveStore.deleteEntries(withIDs: ids, baseURL: settings.backendBaseURL, authToken: sessionManager.currentSession?.token ?? "")
             } catch {
                 deleteError = "Failed to delete from backend: \(error.localizedDescription)"
             }

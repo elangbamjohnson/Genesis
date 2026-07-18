@@ -1,10 +1,13 @@
 import SwiftUI
 
-struct ChatView: View {
-    @EnvironmentObject private var archiveStore: ArchiveStore
+/// Chat view for visitor mode — same chat UI but:
+/// - Header shows "Visiting as [Name]"
+/// - "Leave" button always accessible
+/// - No tabs, no owner-only screens reachable
+struct VisitorChatView: View {
+    @EnvironmentObject private var sessionManager: SessionManager
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var chatStore: ChatStore
-    @EnvironmentObject private var sessionManager: SessionManager
 
     @State private var draft = ""
     @State private var isLoading = false
@@ -17,11 +20,28 @@ struct ChatView: View {
 
     @State private var completedTypingIDs = Set<UUID>()
 
+    private var visitorName: String {
+        sessionManager.currentSession?.role.visitorName ?? "Visitor"
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if archiveStore.entries.isEmpty && chatStore.messages.isEmpty {
-                    emptyState
+                // Visitor mode indicator
+                HStack {
+                    Image(systemName: "person.fill")
+                        .foregroundStyle(.secondary)
+                    Text("Visiting as \(visitorName)")
+                        .font(.footnote.bold())
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 6)
+                .background(Color(.secondarySystemBackground))
+
+                if chatStore.messages.isEmpty {
+                    visitorEmptyState
                 } else {
                     messageList
                 }
@@ -37,20 +57,29 @@ struct ChatView: View {
 
                 inputBar
             }
-            .navigationTitle("Project Genesis")
+            .navigationTitle("Genesis")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Leave", role: .destructive) {
+                        sessionManager.logout(chatStore: chatStore)
+                    }
+                }
+            }
         }
     }
 
-    private var emptyState: some View {
+    // MARK: - Empty state
+
+    private var visitorEmptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "archivebox")
+            Image(systemName: "message")
                 .font(.system(size: 44))
                 .foregroundStyle(.secondary)
 
-            Text("Add memories first")
+            Text("Welcome, \(visitorName)!")
                 .font(.title3.bold())
 
-            Text("Add memories through the backend admin page. Answers are grounded only in saved memories.")
+            Text("Ask Genesis anything about its life, stories, and memories. Your conversation is private to this session.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -59,12 +88,14 @@ struct ChatView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - Message list
+
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 12) {
                     ForEach(chatStore.messages) { message in
-                        ChatBubble(
+                        VisitorChatBubble(
                             message: message,
                             shouldTypewrite: message.role == .assistant && !completedTypingIDs.contains(message.id),
                             onTypingComplete: {
@@ -78,7 +109,7 @@ struct ChatView: View {
                     }
 
                     if isLoading {
-                        ProgressView(statusMessage.isEmpty ? "Asking local model..." : statusMessage)
+                        ProgressView(statusMessage.isEmpty ? "Asking Genesis..." : statusMessage)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
@@ -100,20 +131,13 @@ struct ChatView: View {
                     }
                 }
             }
-            .onChange(of: isInputFocused) { focused in
-                guard focused else { return }
-                Task {
-                    try? await Task.sleep(nanoseconds: 250_000_000)
-                    scrollToBottom(proxy: proxy, animated: true)
-                }
-            }
             .onAppear {
                 scrollToBottom(proxy: proxy, animated: false)
             }
         }
     }
 
-    private static let bottomAnchorID = "bottom-anchor"
+    private static let bottomAnchorID = "visitor-bottom-anchor"
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
         if animated {
@@ -125,9 +149,11 @@ struct ChatView: View {
         }
     }
 
+    // MARK: - Input bar
+
     private var inputBar: some View {
         HStack(alignment: .center, spacing: 8) {
-            TextField("Ask about your life...", text: $draft)
+            TextField("Ask about their life...", text: $draft)
                 .textFieldStyle(.roundedBorder)
                 .disabled(isLoading)
                 .focused($isInputFocused)
@@ -152,6 +178,8 @@ struct ChatView: View {
         .padding()
         .background(.bar)
     }
+
+    // MARK: - Send logic
 
     private func triggerSend() {
         guard !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isLoading else { return }
@@ -180,11 +208,7 @@ struct ChatView: View {
             sendTask = nil
         }
 
-        // Build history BEFORE appending the new question — the backend
-        // treats `question` as the current turn and `history` as everything
-        // that came before it (last 8 turns, user + assistant).
         let history = chatStore.historyForAPI()
-
         chatStore.appendUserMessage(question)
 
         do {
@@ -211,7 +235,9 @@ struct ChatView: View {
     }
 }
 
-private struct ChatBubble: View {
+// MARK: - Chat bubble (visitor version, no owner-specific styling)
+
+private struct VisitorChatBubble: View {
     let message: ChatMessage
     let shouldTypewrite: Bool
     let onTypingComplete: () -> Void
@@ -225,7 +251,7 @@ private struct ChatBubble: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 if shouldTypewrite {
-                    TypewriterText(
+                    VisitorTypewriterText(
                         text: message.content,
                         onUpdate: onTypingUpdate,
                         onComplete: onTypingComplete
@@ -253,7 +279,7 @@ private struct ChatBubble: View {
     }
 }
 
-private struct TypewriterText: View {
+private struct VisitorTypewriterText: View {
     let text: String
     var characterDelayNanoseconds: UInt64 = 18_000_000
     var onUpdate: () -> Void = {}

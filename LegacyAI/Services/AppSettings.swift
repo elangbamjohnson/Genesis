@@ -23,6 +23,7 @@ final class AppSettings: ObservableObject {
         didSet { save() }
     }
 
+
     private enum Key {
         static let serverBaseURL = "serverBaseURL"
         static let backendBaseURL = "backendBaseURL"

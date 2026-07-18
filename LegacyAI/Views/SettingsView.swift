@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var archiveStore: ArchiveStore
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var sessionManager: SessionManager
+    @EnvironmentObject private var chatStore: ChatStore
 
     @State private var isTestingConnection = false
     @State private var isTestingChat = false
@@ -132,6 +134,21 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+
+                Section("Account") {
+                    HStack {
+                        Image(systemName: "person.badge.key.fill")
+                            .foregroundStyle(.green)
+                        Text("Logged in as Owner")
+                            .font(.body)
+                    }
+
+                    Button(role: .destructive) {
+                        sessionManager.logout(chatStore: chatStore)
+                    } label: {
+                        Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                }
             }
             .navigationTitle("Settings")
         }
@@ -210,7 +227,12 @@ struct SettingsView: View {
         defer { isPushingArchive = false }
 
         do {
-            let result = try await archiveStore.pushArchiveToBackend(baseURL: settings.backendBaseURL)
+            guard let token = sessionManager.currentSession?.token else {
+                backendMessage = "No active session — please log in again."
+                backendSucceeded = false
+                return
+            }
+            let result = try await archiveStore.pushArchiveToBackend(baseURL: settings.backendBaseURL, authToken: token)
             pushMessage = "Successfully pushed! Imported: \(result.imported), Skipped: \(result.skipped), Failed: \(result.failed)."
         } catch {
             backendMessage = "Failed to push archive: \(error.localizedDescription)"

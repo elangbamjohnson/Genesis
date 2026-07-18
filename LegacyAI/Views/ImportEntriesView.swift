@@ -5,6 +5,7 @@ struct ImportEntriesView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var archiveStore: ArchiveStore
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var sessionManager: SessionManager
 
     @State private var isShowingImporter = false
     @State private var importSummary: ImportSummary?
@@ -74,7 +75,7 @@ struct ImportEntriesView: View {
     private func handleImport(_ result: Result<[URL], Error>) async {
         do {
             let urls = try result.get()
-            importSummary = await archiveStore.importFiles(from: urls, baseURL: settings.backendBaseURL)
+            importSummary = await archiveStore.importFiles(from: urls, baseURL: settings.backendBaseURL, authToken: sessionManager.currentSession?.token ?? "")
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription

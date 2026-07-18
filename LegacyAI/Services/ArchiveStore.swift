@@ -36,7 +36,8 @@ final class ArchiveStore: ObservableObject {
         category: LifeEntry.Category,
         tags: [String],
         date: Date,
-        baseURL: String
+        baseURL: String,
+        authToken: String
     ) async throws {
         let entry = LifeEntry(
             title: title,
@@ -46,20 +47,20 @@ final class ArchiveStore: ObservableObject {
             date: date
         )
 
-        let created = try await client.createMemory(entry, baseURL: baseURL)
+        let created = try await client.createMemory(entry, baseURL: baseURL, authToken: authToken)
         entries.insert(created, at: 0)
         saveLocalCache(entries)
     }
 
-    func deleteEntries(withIDs ids: Set<LifeEntry.ID>, baseURL: String) async throws {
+    func deleteEntries(withIDs ids: Set<LifeEntry.ID>, baseURL: String, authToken: String) async throws {
         for id in ids {
-            try await client.deleteMemory(id: id, baseURL: baseURL)
+            try await client.deleteMemory(id: id, baseURL: baseURL, authToken: authToken)
         }
         entries.removeAll { ids.contains($0.id) }
         saveLocalCache(entries)
     }
 
-    func importFiles(from urls: [URL], baseURL: String) async -> ImportSummary {
+    func importFiles(from urls: [URL], baseURL: String, authToken: String) async -> ImportSummary {
         var importedEntries: [LifeEntry] = []
         var failedFileNames: [String] = []
 
@@ -81,7 +82,7 @@ final class ArchiveStore: ObservableObject {
                     tags: [],
                     date: Date()
                 )
-                let created = try await client.createMemory(entry, baseURL: baseURL)
+                let created = try await client.createMemory(entry, baseURL: baseURL, authToken: authToken)
                 importedEntries.append(created)
             } catch {
                 failedFileNames.append(url.lastPathComponent)
@@ -98,7 +99,7 @@ final class ArchiveStore: ObservableObject {
     }
 
     @discardableResult
-    func importSeedEntries(baseURL: String) async throws -> Int {
+    func importSeedEntries(baseURL: String, authToken: String) async throws -> Int {
         let seedEntries = try loadSeedEntries()
         let existingIDs = Set(entries.map(\.id))
         let newEntries = seedEntries.filter { !existingIDs.contains($0.id) }
@@ -107,17 +108,17 @@ final class ArchiveStore: ObservableObject {
             return 0
         }
 
-        let result = try await client.importEntries(newEntries, baseURL: baseURL, overwrite: false)
+        let result = try await client.importEntries(newEntries, baseURL: baseURL, overwrite: false, authToken: authToken)
         
         // Reload all to get updated list
-        try await load(baseURL: baseURL)
+        await load(baseURL: baseURL)
         return result.imported
     }
 
-    func pushArchiveToBackend(baseURL: String) async throws -> BackendClient.ImportResult {
+    func pushArchiveToBackend(baseURL: String, authToken: String) async throws -> BackendClient.ImportResult {
         let localEntries = try loadLocalCacheEntries()
-        let result = try await client.importEntries(localEntries, baseURL: baseURL, overwrite: false)
-        try await load(baseURL: baseURL)
+        let result = try await client.importEntries(localEntries, baseURL: baseURL, overwrite: false, authToken: authToken)
+        await load(baseURL: baseURL)
         return result
     }
 
