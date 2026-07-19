@@ -115,6 +115,31 @@ final class SessionManager: ObservableObject {
         }
     }
 
+    /// Family member login: validate credentials against backend, then store session.
+    func loginAsFamily(handle: String, password: String, backendBaseURL: String) async {
+        let trimmedHandle = handle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !trimmedHandle.isEmpty, !trimmedPassword.isEmpty else {
+            authError = "Handle and password cannot be empty."
+            return
+        }
+
+        isAuthenticating = true
+        authError = nil
+        defer { isAuthenticating = false }
+
+        do {
+            let result = try await client.loginFamilyMember(handle: trimmedHandle, password: trimmedPassword, baseURL: backendBaseURL)
+            let role = UserRole.visitor(visitorId: result.visitorId, visitorName: result.visitorName)
+            let session = StoredSession(role: role, token: result.token)
+            saveToKeychain(session)
+            currentSession = session
+        } catch {
+            authError = "Login failed: \(error.localizedDescription)"
+        }
+    }
+
     /// Log out: clear Keychain, clear in-memory state.
     /// Pass the ChatStore so we can wipe its history (prevents session bleed).
     func logout(chatStore: ChatStore) {

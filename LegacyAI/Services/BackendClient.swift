@@ -251,6 +251,47 @@ struct BackendClient {
         }
     }
 
+    /// Public family member login. No auth required.
+    func loginFamilyMember(handle: String, password: String, baseURL: String) async throws -> VisitorRegistrationResult {
+        let url = try makeURL(baseURL: baseURL, endpointPath: "/v1/family/login")
+        try validateReachableHost(url.host)
+
+        let payload = ["handle": handle, "password": password]
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 10
+        request.httpBody = try JSONEncoder().encode(payload)
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch let error as URLError {
+            throw clientError(for: error, url: url)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ClientError.invalidResponse
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            if httpResponse.statusCode == 401 {
+                throw ClientError.httpStatus(httpResponse.statusCode, "Invalid handle or password")
+            }
+            throw ClientError.httpStatus(httpResponse.statusCode, body)
+        }
+
+        do {
+            return try JSONDecoder().decode(VisitorRegistrationResult.self, from: data)
+        } catch {
+            throw ClientError.serializationError(error.localizedDescription)
+        }
+    }
+
     func fetchMemories(baseURL: String) async throws -> [LifeEntry] {
         let url = try makeURL(baseURL: baseURL, endpointPath: "/v1/memories")
         try validateReachableHost(url.host)

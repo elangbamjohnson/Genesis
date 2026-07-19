@@ -9,10 +9,13 @@ struct EntryView: View {
     @State private var mode: EntryMode = .choose
     @State private var ownerToken = ""
     @State private var visitorName = ""
+    @State private var familyHandle = ""
+    @State private var familyPassword = ""
 
     enum EntryMode {
         case choose
         case ownerLogin
+        case familyLogin
         case visitorRegister
     }
 
@@ -44,6 +47,8 @@ struct EntryView: View {
                         chooseView
                     case .ownerLogin:
                         ownerLoginView
+                    case .familyLogin:
+                        familyLoginView
                     case .visitorRegister:
                         visitorRegisterView
                     }
@@ -82,10 +87,20 @@ struct EntryView: View {
             .controlSize(.large)
 
             Button {
+                mode = .familyLogin
+                sessionManager.authError = nil
+            } label: {
+                Label("Family Member Login", systemImage: "person.2.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+
+            Button {
                 mode = .visitorRegister
                 sessionManager.authError = nil
             } label: {
-                Label("Visit Genesis", systemImage: "person.fill.questionmark")
+                Label("Visit as Guest", systemImage: "person.fill.questionmark")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
@@ -177,12 +192,64 @@ struct EntryView: View {
         }
     }
 
+    // MARK: - Family Login
+
+    private var familyLoginView: some View {
+        VStack(spacing: 16) {
+            TextField("Handle (e.g. surbala)", text: $familyHandle)
+                .textFieldStyle(.roundedBorder)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+
+            SecureField("Password", text: $familyPassword)
+                .textFieldStyle(.roundedBorder)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.go)
+                .onSubmit { familyLogin() }
+
+            Button {
+                familyLogin()
+            } label: {
+                if sessionManager.isAuthenticating {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Text("Log In")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(familyHandle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || familyPassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || sessionManager.isAuthenticating)
+
+            Button("Back") {
+                mode = .choose
+                familyHandle = ""
+                familyPassword = ""
+                sessionManager.authError = nil
+            }
+            .foregroundStyle(.secondary)
+            .disabled(sessionManager.isAuthenticating)
+        }
+    }
+
     // MARK: - Actions
 
     private func ownerLogin() {
         Task {
             await sessionManager.loginAsOwner(
                 token: ownerToken,
+                backendBaseURL: settings.backendBaseURL
+            )
+        }
+    }
+
+    private func familyLogin() {
+        Task {
+            await sessionManager.loginAsFamily(
+                handle: familyHandle,
+                password: familyPassword,
                 backendBaseURL: settings.backendBaseURL
             )
         }
