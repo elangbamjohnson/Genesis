@@ -1,6 +1,6 @@
 # Genesis
 
-Genesis is a private, offline-first digital legacy app.
+Genesis is a private, offline-first digital legacy app backed by a FastAPI Python service.
 
 The long-term goal is to preserve not only what a person knows, but how they think: memories, values, reasoning patterns, personality, communication style, and the context behind important life events. Future generations should be able to ask meaningful questions and receive answers grounded in intentionally saved memories.
 
@@ -8,19 +8,18 @@ Genesis is not designed to be a generic chatbot. The app should never invent per
 
 ## Current Milestone
 
-The current milestone is a local iOS chat application that talks to a local MLX model server.
+The current milestone is a native iOS app that talks to a local Genesis backend (FastAPI + MLX), with a complete authentication and session system.
 
 This phase focuses on:
 
 - Native SwiftUI app structure.
-- A local memory archive.
-- A chat UI grounded in saved memories.
-- Local model selection for MLX.
-- OpenAI-compatible `/v1/chat/completions` requests.
+- Owner, family-member, and visitor authentication modes.
+- Keychain-backed session persistence.
+- A chat UI grounded in backend-retrieved memories.
+- Conversation history sent to backend for multi-turn context.
+- Backend-side memory CRUD (create, read, delete, import).
+- A local MLX model server as the inference engine.
 - Guardrails that reduce hallucination by refusing to call the model when no relevant memory is found.
-- A simple path for adding, importing, and loading sample memories.
-
-There is no RAG vector database yet, no embeddings, no cloud sync, no user account system, no voice cloning, and no image understanding. Those belong to later phases.
 
 ## Principles
 
@@ -33,24 +32,37 @@ There is no RAG vector database yet, no embeddings, no cloud sync, no user accou
 
 ## App Overview
 
-The app currently has three primary tabs:
+The app has three user-facing flows depending on who is logged in.
+
+### Owner flow (full access)
 
 | Tab | Purpose |
 | --- | --- |
-| Chat | Ask questions and receive first-person, memory-grounded answers. |
-| Archive | View, search, add, delete, and import memories. |
-| Settings | Configure persona voice, MLX server address, model selection, connection tests, and bundled sample imports. |
+| Chat | Ask questions, receive memory-grounded answers, view source titles. |
+| Archive | View, search, add, delete, and import memories to/from the backend. |
+| Settings | Configure persona, backend URL, MLX server address, model, connection tests. |
 
-The app stores memories as `LifeEntry` records with:
+### Family member flow
 
-- `id`
-- `title`
-- `content`
-- `category`
-- `tags`
-- `date`
+Family members log in with a handle + password registered by the owner on the backend. They reach the same `VisitorChatView` as guests but are authenticated with a persistent identity. Their session is stored in Keychain and restored on next launch.
 
-The app stores chat messages as `ChatMessage` records and can show which memory titles were used as sources for a response.
+### Visitor (guest) flow
+
+Visitors enter their name and self-register. The backend issues a signed visitor token. The visitor sees `VisitorChatView` — a read-only, single-session chat interface with a "Leave" button that clears the session and returns to the entry screen.
+
+---
+
+## Entry Screen
+
+`LegacyAI/Views/EntryView.swift`
+
+The entry screen is shown whenever there is no valid session in Keychain. It presents three choices:
+
+- **Owner Login** — enter the backend `GENESIS_AUTHOR_TOKEN` to authenticate.
+- **Family Member Login** — enter a registered handle and password (`POST /v1/family/login`).
+- **Visit as Guest** — enter a display name to self-register (`POST /v1/visitors/self-register`).
+
+---
 
 ## Repository Layout
 
@@ -58,24 +70,42 @@ The app stores chat messages as `ChatMessage` records and can show which memory 
 Genesis
 ├── App
 │   └── Assets.xcassets
-├── Backend
-├── Core
-├── Docs
-├── Features
+├── LegacyAI
+│   ├── Info.plist
+│   ├── LegacyAIApp.swift
+│   ├── Models
+│   │   ├── ChatMessage.swift
+│   │   └── LifeEntry.swift
+│   ├── Resources
+│   │   └── sample_entries.json
+│   ├── Services
+│   │   ├── AppSettings.swift
+│   │   ├── ArchiveStore.swift
+│   │   ├── BackendClient.swift
+│   │   ├── ChatStore.swift
+│   │   ├── MLXChatService.swift
+│   │   ├── ModelSettings.swift
+│   │   ├── RetrievalEngine.swift
+│   │   ├── PersonaPromptBuilder.swift
+│   │   └── SessionManager.swift
+│   └── Views
+│       ├── AddEntryView.swift
+│       ├── ChatView.swift
+│       ├── ContentView.swift
+│       ├── EntryListView.swift
+│       ├── EntryView.swift
+│       ├── ImportEntriesView.swift
+│       ├── SettingsView.swift
+│       └── VisitorChatView.swift
 ├── Genesis.xcodeproj
 ├── GenesisTests
 ├── GenesisUITests
-├── LegacyAI
-│   ├── Models
-│   ├── Resources
-│   ├── Services
-│   └── Views
-├── Resources
-├── Services
 └── README.md
 ```
 
-The active iOS app code currently lives under `LegacyAI`. The top-level folders exist for the broader Genesis architecture and future migration into a cleaner feature-based structure.
+The active iOS app code lives under `LegacyAI`.
+
+---
 
 ## Active Code Structure
 
@@ -87,147 +117,273 @@ Defines one saved memory. Categories include childhood, family, career, values, 
 
 `LegacyAI/Models/ChatMessage.swift`
 
-Defines messages shown in the chat UI, including optional source memory titles for assistant responses.
+Defines messages shown in the chat UI, including role (`user` / `assistant`) and optional source memory titles for assistant responses.
+
+---
 
 ### Services
 
+`LegacyAI/Services/AppSettings.swift`
+
+Persists app settings in `UserDefaults`:
+
+| Setting | Key | Default |
+| --- | --- | --- |
+| MLX server URL | `serverBaseURL` | `http://192.168.x.x:8080` |
+| Genesis backend URL | `backendBaseURL` | `http://192.168.x.x:8090` |
+| Selected MLX model name | `modelName` | First supported model |
+| Persona name | `personaName` | `Me` |
+| Style notes | `styleNotes` | First-person calm voice |
+
+`LegacyAI/Services/SessionManager.swift`
+
+Single source of truth for authentication state. Stores `StoredSession` (role + token) in the iOS **Keychain** — never in `UserDefaults`. Survives app relaunch.
+
+Supports three roles via `UserRole`:
+
+- `.owner` — full access, token validated against `/v1/auth/check`.
+- `.visitor(visitorId:visitorName:)` — read-only chat. Created by self-registration or family login.
+
+Key methods:
+
+| Method | Backend endpoint | Description |
+| --- | --- | --- |
+| `loginAsOwner(token:backendBaseURL:)` | `GET /v1/auth/check` | Validates owner token, stores session. |
+| `loginAsFamily(handle:password:backendBaseURL:)` | `POST /v1/family/login` | Authenticates with handle + password. |
+| `registerAsVisitor(name:backendBaseURL:)` | `POST /v1/visitors/self-register` | Issues a signed visitor token. |
+| `logout(chatStore:)` | — | Clears Keychain + in-memory chat history. |
+| `handleUnauthorized(chatStore:)` | — | Called on 401/403 — clears session, shows error. |
+
+Fail-closed: any Keychain read failure → no session → entry screen.
+
+`LegacyAI/Services/BackendClient.swift`
+
+All HTTP communication with the Genesis FastAPI backend. Handles:
+
+- `POST /v1/chat` — send a question with conversation history, receive an answer + source titles.
+- `GET /v1/auth/check` — owner token validation.
+- `POST /v1/visitors/self-register` — visitor self-registration.
+- `POST /v1/family/login` — family member login.
+- `GET /v1/memories` — fetch all memories (owner).
+- `POST /v1/memories` — create a new memory (owner, authenticated).
+- `DELETE /v1/memories/{id}` — delete a memory (owner, authenticated).
+- `POST /v1/memories/import` — bulk import memories (owner, authenticated).
+- `GET /health` — health check.
+
+Applies `Authorization: Bearer <token>` to all authenticated requests. Translates `URLError` codes into human-readable `ClientError` cases. Blocks `127.0.0.1` / `localhost` on real devices (see Simulator vs Physical iPhone below).
+
+Chat request payload shape:
+
+```json
+{
+  "question": "Do you remember our first date?",
+  "history": [
+    { "role": "user", "content": "..." },
+    { "role": "assistant", "content": "..." }
+  ]
+}
+```
+
+Chat response shape:
+
+```json
+{
+  "answer": "Of course I do ...",
+  "source_titles": ["First Date - Shillong"]
+}
+```
+
+`LegacyAI/Services/ChatStore.swift`
+
+Persists the on-device chat thread in `UserDefaults`. Builds the `history` array sent to `/v1/chat` — the last 8 turns (4 back-and-forth exchanges). Cleared on logout to prevent session bleed between users.
+
 `LegacyAI/Services/ArchiveStore.swift`
 
-Owns the local memory archive. It loads and saves `archive_entries.json` in the app documents directory, seeds from bundled sample entries on first launch, imports text files, deletes entries, and can import bundled sample memories later from Settings.
+Owns the local memory archive. Loads and saves `archive_entries.json` in the app documents directory, seeds from bundled sample entries on first launch, imports text files, and can import bundled sample memories from Settings.
 
 `LegacyAI/Services/RetrievalEngine.swift`
 
-Performs local keyword-based retrieval over memory title, content, category, and tags. It scores direct term matches strongly, applies limited related-term expansion, and avoids using broad generic terms like "memory", "remember", and "tell" as retrieval signals.
+Performs local keyword-based retrieval over memory title, content, category, and tags. Used as a local fallback when in offline/MLX-only mode. The backend performs its own intent resolution and retrieval for the primary path.
 
 `LegacyAI/Services/PersonaPromptBuilder.swift`
 
-Builds the system and user prompts sent to the local model. It tells the model to speak in first person, rephrase memories naturally, answer only from retrieved memories, and explicitly say when a fact is not recorded.
+Builds the system and user prompts sent to the local MLX model (offline/fallback path only). Tells the model to speak in first person, rephrase memories naturally, and answer only from retrieved memories.
 
 `LegacyAI/Services/MLXChatService.swift`
 
-Calls a local OpenAI-compatible MLX server. It supports:
-
-- `GET /v1/models` connection checks.
-- `POST /v1/chat/completions` chat requests.
-- Model mismatch detection.
-- Better messages for 404 model errors.
-- Timeout handling for model loading or long generations.
-- Device safety checks so `127.0.0.1` is only used in the simulator.
+Calls a local OpenAI-compatible MLX server. Supports connection checks, chat completions, model mismatch detection, timeout handling, and device safety checks.
 
 `LegacyAI/Services/ModelSettings.swift`
 
-Defines supported local models and normalizes user-facing model names into the exact model id/path expected by the server.
+Defines supported local MLX models and normalizes user-facing model names into the exact model id/path expected by the server.
 
-`LegacyAI/Services/AppSettings.swift`
-
-Persists app settings in `UserDefaults`, including server URL, selected model, persona name, and style notes.
+---
 
 ### Views
 
+`LegacyAI/Views/EntryView.swift`
+
+Entry screen shown when no valid session exists in Keychain. Offers Owner Login, Family Member Login, and Visit as Guest flows. Animated transitions between modes. Shows auth errors inline.
+
 `LegacyAI/Views/ContentView.swift`
 
-Creates the main tab layout.
+Root view that routes between `EntryView` (no session) and the main tabbed interface (owner) or `VisitorChatView` (visitor/family session).
 
 `LegacyAI/Views/ChatView.swift`
 
-Displays the chat interface, retrieves relevant memories before each model call, refuses ungrounded questions when no memory matches, and supports cancelling in-flight requests.
+Owner chat interface. Sends questions + history to the backend, shows source memory titles on assistant replies, supports cancelling in-flight requests.
+
+`LegacyAI/Views/VisitorChatView.swift`
+
+Chat interface for visitors and family members. Same chat UX as the owner view but:
+
+- Header banner shows "Visiting as [Name]".
+- "Leave" button in the navigation bar clears session and returns to `EntryView`.
+- No access to Archive or Settings tabs.
+- Typewriter animation on assistant responses.
+- Handles `401` from backend by calling `SessionManager.handleUnauthorized`.
 
 `LegacyAI/Views/EntryListView.swift`
 
-Displays saved memories, search, detail navigation, delete support, and entry import/add actions.
+Displays saved memories with search, detail navigation, delete support, and entry import/add actions.
 
 `LegacyAI/Views/AddEntryView.swift`
 
-Creates a new memory manually.
+Creates a new memory manually and syncs to the backend (owner only).
 
 `LegacyAI/Views/ImportEntriesView.swift`
 
-Imports `.txt` or `.md` files as memory entries.
+Imports `.txt` or `.md` files as memory entries and bulk-imports them to the backend.
 
 `LegacyAI/Views/SettingsView.swift`
 
-Configures persona and local model server settings. It also includes connection tests, chat endpoint testing, model selection, memory count, load-error display, and a button to load bundled sample memories.
+Configures persona and server settings. Includes both MLX server URL and Genesis backend URL fields, connection tests, model selection, and bundled sample memory import.
+
+---
 
 ### Resources
 
 `LegacyAI/Resources/sample_entries.json`
 
-Bundled seed memories. This file must stay valid JSON. JSON comments are not allowed. On first app launch, this file is copied into the app's local archive if no archive exists yet. If the simulator already has an empty archive, use Settings -> Archive -> Load bundled sample memories.
+Bundled seed memories. Must stay valid JSON. Copied into the app's local archive on first launch if no archive exists. Use Settings → Archive → Load bundled sample memories if the simulator already has an archive.
 
-## Memory Flow
+---
 
-The current flow is deliberately simple:
+## Authentication Flow
 
 ```text
-Saved memories
-    -> ArchiveStore
-    -> RetrievalEngine
-    -> PersonaPromptBuilder
-    -> MLXChatService
-    -> Local MLX model
-    -> ChatView
+App launch
+    → Load StoredSession from Keychain
+    → No session?  → EntryView (choose role)
+    → Has session? → ContentView (owner tabs or VisitorChatView)
+
+Owner login:
+    EntryView → enter GENESIS_AUTHOR_TOKEN
+    → BackendClient.validateOwnerToken → GET /v1/auth/check
+    → 200 → SessionManager stores .owner session in Keychain
+    → 401 → show error
+
+Family login:
+    EntryView → enter handle + password
+    → BackendClient.loginFamilyMember → POST /v1/family/login
+    → 200 → SessionManager stores .visitor session in Keychain
+    → 401 → show "Invalid handle or password"
+
+Visitor self-register:
+    EntryView → enter name
+    → BackendClient.selfRegisterVisitor → POST /v1/visitors/self-register
+    → 200 → SessionManager stores .visitor session in Keychain
+
+Any request → 401:
+    → SessionManager.handleUnauthorized
+    → Clears Keychain + chat history → EntryView
 ```
 
-When the user sends a question:
+---
 
-1. `ChatView` trims the question.
-2. `RetrievalEngine` searches saved memories.
-3. If no relevant memory is found, the app returns a deterministic no-record response without calling the model.
-4. If relevant memories are found, `PersonaPromptBuilder` creates a grounded prompt.
-5. `MLXChatService` sends the request to the local MLX server.
-6. The response is shown with source memory titles.
+## Chat Flow (Backend path)
 
-This is the first hallucination guardrail: no retrieved memory means no model generation.
+```text
+User sends question
+    → ChatStore.historyForAPI() (last 8 turns)
+    → BackendClient.sendChat(question, history, baseURL, authToken)
+    → POST /v1/chat with Bearer token
+    → Backend: intent resolution → retrieval → MLX inference
+    → { answer, source_titles }
+    → ChatStore.appendAssistantMessage
+    → ChatView / VisitorChatView renders reply with source titles
+```
+
+The backend handles intent resolution, retrieval, tone-tier selection (owner vs. visitor vs. wife persona), and MLX generation. The iOS app passes conversation `history` so the backend can resolve follow-up questions in context.
+
+---
 
 ## Hallucination Guardrails
 
-Genesis currently reduces hallucination in several ways:
+Genesis reduces hallucination in several ways:
 
-- Retrieval must find at least one matching memory before the model is called.
-- Generic query words are treated as stopwords.
-- Related-term matching is limited and cannot freely pull unrelated memories.
-- The model prompt explicitly forbids inventing personal facts.
-- The prompt tells the model to say when a record is missing.
-- The UI shows source memory titles for generated answers.
+- **Backend side**: retrieval must find at least one matching memory before the model is called; intent is resolved before retrieval; empty-state responses are humane rather than fabricated.
+- **Local side** (MLX-only fallback): retrieval must find at least one matching memory; generic query words are treated as stopwords; the model prompt forbids inventing personal facts.
+- The UI shows source memory titles for every generated answer.
 
-These guardrails are not a replacement for full RAG, citations, or evaluation tests, but they are enough for the current local prototype.
+---
 
-## Local Model Server
+## Local MLX Model Server
 
-Genesis expects a local OpenAI-compatible MLX server.
-
-The app currently supports these models:
+Genesis expects a local OpenAI-compatible MLX server (port 8080 by default).
 
 | Model | Best for | App model value |
 | --- | --- | --- |
-| Qwen2.5 14B Instruct (Local) | Default conversational legacy answers | `/Users/johnsonelangbam/.cache/huggingface/mlx-qwen25-14b-instruct` |
+| Qwen2.5 14B Instruct | Default conversational legacy answers | `~/.cache/huggingface/mlx-qwen25-14b-instruct` |
 | Qwen2.5 Coder 14B Instruct | Programming and technical explanations | `mlx-community/Qwen2.5-Coder-14B-Instruct-4bit` |
 
-Start the default local Instruct model:
+Start the default model:
 
 ```bash
 mlx_lm.server --host 0.0.0.0 --port 8080 --model ~/.cache/huggingface/mlx-qwen25-14b-instruct
 ```
 
-Start the Coder model:
+---
+
+## Genesis Backend
+
+The iOS app communicates with the `genesis-backend` FastAPI service (port 8090 by default).
+
+Start the backend:
 
 ```bash
-mlx_lm.server --host 0.0.0.0 --port 8080 --model mlx-community/Qwen2.5-Coder-14B-Instruct-4bit
+cd genesis-backend
+uvicorn app.main:app --host 0.0.0.0 --port 8090 --reload
 ```
 
-The selected model in Genesis must match the model currently served by MLX.
+Backend API surface:
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `GET` | `/health` | None | Health check |
+| `GET` | `/v1/auth/check` | Owner | Validate owner token |
+| `POST` | `/v1/visitors/self-register` | None | Guest self-registration |
+| `POST` | `/v1/family/login` | None | Family member login |
+| `POST` | `/v1/chat` | Owner or Visitor | Memory-grounded chat |
+| `GET` | `/v1/memories` | Owner | List all memories |
+| `POST` | `/v1/memories` | Owner | Create a memory |
+| `DELETE` | `/v1/memories/{id}` | Owner | Delete a memory |
+| `POST` | `/v1/memories/import` | Owner | Bulk import memories |
+
+Owner authentication uses a static `GENESIS_AUTHOR_TOKEN` set in the backend `.env` file. Visitor tokens are HMAC-signed and validated against the database on every request — stale tokens are rejected with `401`.
+
+---
 
 ## Simulator vs Physical iPhone
 
-For the iOS Simulator, this can work:
+For the iOS Simulator:
 
 ```text
-http://127.0.0.1:8080
+http://127.0.0.1:8080    (MLX server)
+http://127.0.0.1:8090    (Genesis backend)
 ```
 
-For a physical iPhone, do not use `127.0.0.1` or `localhost`; those point to the phone itself. Use the Mac's LAN IP.
-
-Find the Mac LAN IP:
+For a physical iPhone, do not use `127.0.0.1` or `localhost`. Use the Mac's LAN IP:
 
 ```bash
 ipconfig getifaddr en0
@@ -236,10 +392,13 @@ ipconfig getifaddr en0
 Then use:
 
 ```text
-http://<mac-lan-ip>:8080
+http://<mac-lan-ip>:8080    (MLX server)
+http://<mac-lan-ip>:8090    (Genesis backend)
 ```
 
-The Mac and iPhone must be on the same Wi-Fi network, and the MLX server should be started with `--host 0.0.0.0`.
+The Mac and iPhone must be on the same Wi-Fi network. Both servers must be started with `--host 0.0.0.0`.
+
+---
 
 ## Xcode And Permissions
 
@@ -251,117 +410,79 @@ The app uses `LegacyAI/Info.plist` for local networking:
 - `NSAppTransportSecurity`
 - `NSAllowsLocalNetworking = YES`
 
-The app should avoid blanket arbitrary networking because the product goal is private local execution.
+---
 
 ## Running The App
 
-Build from Xcode by opening:
+1. Start the MLX server (`--host 0.0.0.0 --port 8080`).
+2. Start the Genesis backend (`--host 0.0.0.0 --port 8090`).
+3. Open `Genesis.xcodeproj` in Xcode.
+4. Build and run on device or simulator.
+5. Set the backend URL and MLX URL in Settings.
+6. Run Test connection for both.
+7. Log in (owner token, family handle/password, or guest name).
 
-```text
-Genesis.xcodeproj
-```
+---
 
-Or build from the command line:
+## Adding Memories (Owner)
 
-```bash
-xcodebuild build -project Genesis.xcodeproj -scheme Genesis -destination 'generic/platform=iOS Simulator' -derivedDataPath /private/tmp/GenesisDerivedData
-```
-
-Before chatting:
-
-1. Start the MLX server.
-2. Open Genesis.
-3. Go to Settings.
-4. Select the matching model.
-5. Confirm the server address.
-6. Run Test connection.
-7. Run Test chat response.
-8. Add or import memories in Archive.
-
-## Adding Memories
-
-Current options:
-
-- Add a memory manually in Archive.
-- Import `.txt` or `.md` files.
+- Add a memory manually in Archive → syncs to backend.
+- Import `.txt` or `.md` files → bulk-sent to backend.
 - Load bundled sample memories from Settings.
 
-Each memory should be specific. Short, concrete entries work better than broad life summaries because retrieval is currently keyword-based.
+Each memory should be specific. One event, belief, lesson, or relationship per entry. Clear title, natural first-person content, useful tags, and a date if known.
 
-Recommended memory shape:
-
-- One event, belief, lesson, or relationship per entry.
-- Clear title.
-- Natural first-person content.
-- Useful tags such as `childhood`, `school`, `family`, `career`, or a person's name.
-- Date if known; approximate dates are acceptable if the entry says they are approximate.
+---
 
 ## Current Limitations
 
-- Retrieval is keyword-based, not semantic.
-- There is no vector database yet.
-- There is no backend integration yet in the active app path.
-- There is no authentication or account system.
-- There is no encryption layer implemented yet.
-- Imported files become simple memory entries without chunking.
+- Retrieval is keyword-based on the local fallback path; the backend uses intent + attribute matching.
+- No vector database or local embeddings yet.
 - The model can still phrase things poorly if the retrieved memory is too broad or ambiguous.
 - The app is not ready for sensitive production use until encryption, export, backup, deletion, and audit behavior are designed.
 
+---
+
 ## Future Pipeline
 
-The intended evolution is incremental:
+1. Replace keyword retrieval with local semantic retrieval (sqlite-vec + embeddings).
+2. Add chunking and citation-like source tracking.
+3. Add evaluation tests for hallucination, grounding, and refusal behavior.
+4. Add local encryption, backup, export, and deletion guarantees.
+5. Add timeline views for life events.
+6. Add relationship graph support.
+7. Add personality and decision-modeling layers.
+8. Add voice support only after the memory and privacy architecture is stable.
+9. Add image understanding only when local models and explicit consent flows are ready.
 
-1. Improve archive data quality with better fields, tags, dates, and relationship metadata.
-2. Add local embeddings and sqlite-vec for semantic retrieval.
-3. Add chunking and citation-like source tracking.
-4. Add a FastAPI backend for local services that should not live in the iOS app.
-5. Add a memory ingestion pipeline for journals, markdown files, GitHub content, and structured notes.
-6. Add evaluation tests for hallucination, grounding, and refusal behavior.
-7. Add local encryption, backup, export, and deletion guarantees.
-8. Add timeline views for life events.
-9. Add relationship graph support.
-10. Add personality and decision-modeling layers.
-11. Add voice support only after the memory and privacy architecture is stable.
-12. Add image understanding only when local models and explicit consent flows are ready.
-
-## Backend Direction
-
-The repository includes a `Backend` folder, but the active milestone is still iOS plus a local MLX server.
-
-The planned backend stack is:
-
-- Python
-- FastAPI
-- Local-only execution
-- sqlite-vec initially
-- PostgreSQL only if the data model outgrows SQLite
-- Neo4j only in later graph-focused phases
-
-The backend should eventually own heavier ingestion, embedding, retrieval, and indexing work while the iOS app remains the user-facing interface.
+---
 
 ## Design Rules For Future Work
 
-- SwiftUI views should talk to view models or services, not directly to networking.
+- SwiftUI views should talk to `SessionManager`, `ChatStore`, or `BackendClient` — not raw networking.
 - Business logic should stay out of views.
 - Services should be protocol-oriented where substitution matters.
 - The archive format should remain model-independent.
 - Never add a feature that requires cloud access for core operation.
 - Prefer local, inspectable data formats until there is a strong reason not to.
 - Do not commit private memory data unless that is an explicit choice.
+- The backend is the source of truth for memories; the local `ArchiveStore` is a cache and offline fallback.
+
+---
 
 ## Project Status
 
-Genesis currently has a working local prototype:
+Genesis currently has a working backend-connected prototype:
 
 - Native SwiftUI app.
-- Local archive storage.
-- Manual memory entry.
-- Text/Markdown import.
-- Bundled sample memory import.
-- Local MLX connection tests.
-- Model picker for supported Qwen models.
-- Grounded prompt generation.
-- Deterministic no-memory response.
-- Source memory titles in chat responses.
+- Owner / family / visitor authentication with Keychain session persistence.
+- Backend-connected memory CRUD (create, read, delete, import).
+- Conversation history sent to backend for multi-turn context.
+- Memory-grounded chat via Genesis backend + MLX.
+- Deterministic no-memory response on backend and local fallback.
+- Source memory titles shown in chat responses.
+- Visitor session DB validation — stale tokens rejected with `401`.
+- Typewriter animation on assistant responses (visitor view).
+- Local MLX connection tests and model picker in Settings.
 
-The next good step is to improve memory ingestion from trusted sources, then replace keyword retrieval with local semantic retrieval.
+The next good step is to replace keyword retrieval with semantic retrieval using embeddings, then expand the backend's intent resolution for more question phrasings.
