@@ -103,7 +103,7 @@ Here is the exact journey of a question when a user types a message into the cha
 1. ChatStore fetches last 8 turns (4 back-and-forth exchanges) for context
              │
              ▼
-2. BackendClient sends POST /v1/chat (Authorization: Bearer <token>) to Genesis Backend
+2. iOS App (using BackendClient.swift) sends POST /v1/chat (Authorization: Bearer <token>) to Genesis Backend
              │
              ▼
 3. Genesis Backend checks user token and performs Memory Retrieval
