@@ -85,16 +85,11 @@ Genesis
 │   │   ├── ChatStore.swift
 │   │   ├── MLXChatService.swift
 │   │   ├── ModelSettings.swift
-│   │   ├── RetrievalEngine.swift
-│   │   ├── PersonaPromptBuilder.swift
 │   │   └── SessionManager.swift
 │   └── Views
-│       ├── AddEntryView.swift
 │       ├── ChatView.swift
 │       ├── ContentView.swift
-│       ├── EntryListView.swift
 │       ├── EntryView.swift
-│       ├── ImportEntriesView.swift
 │       ├── SettingsView.swift
 │       └── VisitorChatView.swift
 ├── Genesis.xcodeproj
@@ -199,15 +194,7 @@ Persists the on-device chat thread in `UserDefaults`. Builds the `history` array
 
 `LegacyAI/Services/ArchiveStore.swift`
 
-Owns the local memory archive. Loads and saves `archive_entries.json` in the app documents directory, seeds from bundled sample entries on first launch, imports text files, and can import bundled sample memories from Settings.
-
-`LegacyAI/Services/RetrievalEngine.swift`
-
-Performs local keyword-based retrieval over memory title, content, category, and tags. Used as a local fallback when in offline/MLX-only mode. The backend performs its own intent resolution and retrieval for the primary path.
-
-`LegacyAI/Services/PersonaPromptBuilder.swift`
-
-Builds the system and user prompts sent to the local MLX model (offline/fallback path only). Tells the model to speak in first person, rephrase memories naturally, and answer only from retrieved memories.
+Owns the local memory cache. Loads and saves `archive_entries.json` in the app documents directory, seeds from bundled sample entries on first launch, and can push the local archive cache to the backend.
 
 `LegacyAI/Services/MLXChatService.swift`
 
@@ -242,18 +229,6 @@ Chat interface for visitors and family members. Same chat UX as the owner view b
 - No access to Archive or Settings tabs.
 - Typewriter animation on assistant responses.
 - Handles `401` from backend by calling `SessionManager.handleUnauthorized`.
-
-`LegacyAI/Views/EntryListView.swift`
-
-Displays saved memories with search, detail navigation, delete support, and entry import/add actions.
-
-`LegacyAI/Views/AddEntryView.swift`
-
-Creates a new memory manually and syncs to the backend (owner only).
-
-`LegacyAI/Views/ImportEntriesView.swift`
-
-Imports `.txt` or `.md` files as memory entries and bulk-imports them to the backend.
 
 `LegacyAI/Views/SettingsView.swift`
 
